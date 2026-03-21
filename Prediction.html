@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>预测长大的你</title>
+    <style>
+        :root {
+            --primary-color: #ff4757;
+            --overlay: rgba(0, 0, 0, 0.4);
+            --error-glow: rgba(255, 71, 87, 0.6);
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: "Microsoft YaHei", sans-serif;
+            overflow: hidden;
+        }
+
+        /* 背景幻灯片 */
+        .slideshow {
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+        }
+
+        .slide {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-size: cover;
+            background-position: center;
+            opacity: 0;
+            transition: opacity 2s ease-in-out;
+        }
+
+        .slide.active { opacity: 1; }
+
+        /* 统一容器 */
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background: var(--overlay);
+            color: white;
+            text-align: center;
+        }
+
+        h1 { font-size: 2.5rem; margin-bottom: 2rem; text-shadow: 2px 2px 10px rgba(0,0,0,0.5); }
+
+        .form-group {
+            margin: 10px 0;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 20px;
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+            width: 350px;
+            transition: all 0.3s;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 10px;
+            margin-top: 8px;
+            border-radius: 5px;
+            border: 2px solid transparent;
+            box-sizing: border-box;
+            outline: none;
+            transition: border 0.3s;
+        }
+
+        /* --- 新增：闪烁动画 --- */
+        @keyframes error-blink {
+            0% { border-color: var(--primary-color); box-shadow: 0 0 5px var(--error-glow); }
+            50% { border-color: transparent; box-shadow: none; }
+            100% { border-color: var(--primary-color); box-shadow: 0 0 5px var(--error-glow); }
+        }
+
+        .error-active {
+            animation: error-blink 0.6s ease-in-out infinite;
+            border: 2px solid var(--primary-color) !important;
+        }
+
+        /* 年龄组件 */
+        .age-control {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+        .btn-age {
+            background: white;
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 1.2rem;
+            margin-top: 8px;
+        }
+        .btn-age:hover { background: #eee; }
+
+        .confirm-btn {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 12px 40px;
+            font-size: 1.1rem;
+            border-radius: 25px;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: transform 0.2s;
+        }
+        .confirm-btn:hover { transform: scale(1.05); }
+
+        /* 预览界面 */
+        #preview-page { display: none; }
+
+        /* 进度条 */
+        .loader-container {
+            width: 300px;
+            height: 20px;
+            background: #eee;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 20px;
+        }
+        .loader-bar {
+            height: 100%;
+            width: 0%;
+            background: #2ed573;
+            transition: width 0.5s linear;
+        }
+
+        #result-photo {
+            margin-top: 30px;
+            max-width: 80%;
+            max-height: 500px;
+            border: 5px solid white;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            opacity: 0;
+            display: none;
+        }
+
+        .tip { 
+            color: #ff6b81; 
+            font-weight: bold; 
+            margin-top: 8px; 
+            font-size: 0.9rem;
+            display: none; 
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="slideshow" id="slideshow">
+        <div class="slide active" style="background-image: url('https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=1200')"></div>
+        <div class="slide" style="background-image: url('https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=1200')"></div>
+        <div class="slide" style="background-image: url('https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=1200')"></div>
+    </div>
+
+    <div class="container" id="login-page">
+        <h1>快来看看长大的你是什么模样吧！</h1>
+        
+        <div class="form-group">
+            <label>你的姓名</label>
+            <input type="text" id="nameInput" placeholder="请输入姓名">
+            <div id="nameError" class="tip">该姓名已被他人使用</div>
+        </div>
+
+        <div class="form-group">
+            <label>你的年龄</label>
+            <div class="age-control">
+                <button class="btn-age" onclick="changeAge(-1)">-</button>
+                <input type="text" id="ageInput" value="18">
+                <button class="btn-age" onclick="changeAge(1)">+</button>
+            </div>
+            <div id="ageError" class="tip">该年龄已被他人使用</div>
+        </div>
+
+        <div class="form-group">
+            <label>你的民族</label>
+            <select id="nationSelect">
+                <option value="None族">None族</option>
+            </select>
+            <div id="nationError" class="tip">该民族已被他人使用</div>
+        </div>
+
+        <button class="confirm-btn" onclick="validateAndSubmit()">确定</button>
+    </div>
+
+    <div class="container" id="preview-page">
+        <h1>快来看看长大的你是什么模样吧！</h1>
+        
+        <div id="loading-box">
+            <p id="status-text">正在分析...</p>
+            <div class="loader-container">
+                <div class="loader-bar" id="loaderBar"></div>
+            </div>
+        </div>
+
+        <img src="Profile.png" id="result-photo" alt="长大的你">
+    </div>
+
+    <script>
+        // 1. 初始化民族下拉框
+        const nations = ["汉族", "蒙古族", "回族", "藏族", "维吾尔族", "苗族", "彝族", "壮族", "布依族", "朝鲜族", "满族", "侗族", "瑶族", "白族", "土家族", "哈尼族", "哈萨克族", "傣族", "黎族", "傈僳族", "佤族", "畲族", "高山族", "拉祜族", "水族", "东乡族", "纳西族", "景颇族", "柯尔克孜族", "土族", "达斡尔族", "仫佬族", "羌族", "布朗族", "撒拉族", "毛南族", "仡佬族", "锡伯族", "阿昌族", "普米族", "塔吉克族", "怒族", "乌孜别克族", "俄罗斯族", "鄂温克族", "德昂族", "保安族", "裕固族", "京族", "塔塔尔族", "独龙族", "鄂伦春族", "赫哲族", "门巴族", "珞巴族", "基诺族"];
+        const select = document.getElementById('nationSelect');
+        nations.forEach(n => {
+            const opt = document.createElement('option');
+            opt.value = n;
+            opt.innerHTML = n;
+            select.appendChild(opt);
+        });
+
+        // 2. 背景轮播
+        let currentSlide = 0;
+        const slides = document.querySelectorAll('.slide');
+        setInterval(() => {
+            slides[currentSlide].classList.remove('active');
+            currentSlide = (currentSlide + 1) % slides.length;
+            slides[currentSlide].classList.add('active');
+        }, 5000);
+
+        // 3. 年龄逻辑
+        function changeAge(step) {
+            const ageInput = document.getElementById('ageInput');
+            let val = ageInput.value;
+            let num = parseInt(val);
+            if (isNaN(num)) num = 0;
+            ageInput.value = num + step;
+        }
+
+        // 4. 提交验证逻辑
+        function validateAndSubmit() {
+            const name = document.getElementById('nameInput');
+            const age = document.getElementById('ageInput');
+            const nation = document.getElementById('nationSelect');
+            
+            const nameError = document.getElementById('nameError');
+            const ageError = document.getElementById('ageError');
+            const nationError = document.getElementById('nationError');
+            
+            // 重置所有状态
+            [name, age, nation].forEach(el => el.classList.remove('error-blink'));
+            [nameError, ageError, nationError].forEach(el => el.style.display = 'none');
+
+            // 逻辑拦截：逐一检查并显示对应错误
+            let pass = true;
+
+            // 检查姓名
+            if (name.value.trim() !== "") {
+                name.classList.add('error-blink');
+                nameError.style.display = 'block';
+                pass = false;
+            } 
+            // 检查年龄
+            else if (age.value !== "null") {
+                age.classList.add('error-blink');
+                ageError.style.display = 'block';
+                pass = false;
+            } 
+            // 检查民族
+            else if (nation.value !== "None族") {
+                nation.classList.add('error-blink');
+                nationError.style.display = 'block';
+                pass = false;
+            }
+
+            if (pass) {
+                startPreview();
+            }
+        }
+
+        // 5. 预览页逻辑 (保持不变)
+        function startPreview() {
+            document.getElementById('login-page').style.display = 'none';
+            document.getElementById('preview-page').style.display = 'flex';
+            
+            const bar = document.getElementById('loaderBar');
+            const status = document.getElementById('status-text');
+            
+            let width = 0;
+            const interval = setInterval(() => {
+                if (width < 90) {
+                    width += Math.random() * 5;
+                    if (width > 90) width = 90;
+                    bar.style.width = width + '%';
+                } else {
+                    clearInterval(interval);
+                    status.innerHTML = "正在分析...";
+                    setTimeout(() => { finishLoading(); }, 4000);
+                }
+            }, 100);
+        }
+
+        function finishLoading() {
+            const bar = document.getElementById('loaderBar');
+            const status = document.getElementById('status-text');
+            const photo = document.getElementById('result-photo');
+
+            bar.style.width = '100%';
+            status.innerHTML = "生成完毕！";
+
+            setTimeout(() => {
+                document.getElementById('loading-box').style.display = 'none';
+                photo.style.display = 'block';
+                let opacity = 0;
+                const fadeIn = setInterval(() => {
+                    if (opacity < 1) {
+                        opacity += 0.05;
+                        photo.style.opacity = opacity;
+                    } else {
+                        clearInterval(fadeIn);
+                    }
+                }, 100);
+            }, 500);
+        }
+    </script>
+</body>
+</html>
