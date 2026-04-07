@@ -1,0 +1,374 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>用户身份统一注册中心</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.263.0/lucide.min.css">
+    <style>
+        @keyframes progress {
+            0% { width: 0%; }
+            100% { width: 100%; }
+        }
+        .animate-progress {
+            animation: progress 5s linear infinite;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 20px;
+            width: 20px;
+            border-radius: 50%;
+            background: #2563eb;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(37, 99, 235, 0.4);
+        }
+        .step-content { display: none; }
+        .step-content.active { display: flex; }
+        .kb-key.selected { background-color: #2563eb; color: white; transform: scale(1.1); box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    </style>
+</head>
+<body class="min-h-screen bg-gray-50 flex items-center justify-center p-4 font-sans text-gray-800">
+
+<!-- 增大了 max-w-md 到 max-w-lg 以容纳更多内容 -->
+<div class="max-w-lg w-full bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100 transition-all duration-300">
+    <!-- Header -->
+    <div class="bg-blue-600 p-6 text-white text-center">
+        <h1 class="text-xl font-bold tracking-tight">用户身份统一注册中心</h1>
+        <p class="text-blue-100 text-sm mt-1">请遵循标准化流程完成注册</p>
+    </div>
+
+    <!-- Step Indicator -->
+    <div id="step-indicator" class="flex border-b border-gray-100">
+        <div class="step-tab flex-1 py-3 text-center text-xs font-medium text-blue-600 border-b-2 border-blue-600">基本资料</div>
+        <div class="step-tab flex-1 py-3 text-center text-xs font-medium text-gray-400">账号设置</div>
+        <div class="step-tab flex-1 py-3 text-center text-xs font-medium text-gray-400">安全核验</div>
+    </div>
+
+    <!-- Content Area - 增加了 min-h 以防止键盘弹出时容器抖动 -->
+    <div class="p-8 min-h-[500px] flex flex-col relative">
+
+        <!-- Global Message -->
+        <div id="message-box" class="hidden mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm items-center gap-2 animate-bounce">
+            <i data-lucide="alert-circle" class="w-4 h-4"></i>
+            <span id="message-text"></span>
+        </div>
+
+        <!-- STEP 1: Basic Info -->
+        <div id="step-1" class="step-content active flex-col space-y-6">
+            <div class="space-y-2 relative">
+                <label class="text-sm font-semibold flex items-center gap-2"><i data-lucide="user" class="w-4 h-4"></i> 昵称</label>
+                <input type="text" id="nickname-input" readonly placeholder="点击输入昵称"
+                       class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer">
+
+                <!-- Virtual Keyboard - 优化了位置 -->
+                <div id="virtual-keyboard" class="hidden absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 shadow-2xl rounded-xl p-4 z-50">
+                    <div class="flex justify-between items-center mb-3">
+                        <span class="text-xs font-bold text-gray-500 uppercase tracking-widest">为注册的人类命名</span>
+                        <span class="text-[10px] bg-gray-100 px-2 py-1 rounded text-gray-400">使用 WASD 控制 / Enter 确认</span>
+                    </div>
+                    <div id="keyboard-grid" class="grid grid-cols-6 gap-2"></div>
+                </div>
+            </div>
+
+            <div class="space-y-2">
+                <label class="text-sm font-semibold flex items-center gap-2"><i data-lucide="calendar" class="w-4 h-4"></i> 出身日期</label>
+                <div class="grid grid-cols-3 gap-2">
+                    <select id="year-select" class="px-2 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"></select>
+                    <select id="month-select" class="px-2 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"></select>
+                    <select id="day-select" class="px-2 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"></select>
+                </div>
+            </div>
+
+            <button id="btn-next-1" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 group">
+                下一步 <i data-lucide="chevron-right" class="w-4 h-4 group-hover:translate-x-1 transition-transform"></i>
+            </button>
+        </div>
+
+        <!-- STEP 2: Account Settings -->
+        <div id="step-2" class="step-content flex-col space-y-6">
+            <div class="space-y-2 relative">
+                <label class="text-sm font-semibold flex items-center gap-2"><i data-lucide="mail" class="w-4 h-4"></i> 电子邮箱</label>
+                <input type="text" id="email-input" placeholder="example@domain.com"
+                       class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none">
+
+                <div id="celeb-list" class="hidden absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 shadow-xl rounded-xl z-50 overflow-hidden">
+                    <div class="p-2 bg-gray-50 text-[10px] text-gray-400 font-bold border-b">推荐的提及对象</div>
+                    <div id="celeb-items"></div>
+                    <div id="close-celeb" class="p-2 text-center text-xs text-blue-500 hover:bg-blue-50 cursor-pointer border-t font-medium">关闭并应用首选项</div>
+                </div>
+            </div>
+
+            <div class="space-y-2">
+                <label class="text-sm font-semibold flex items-center gap-2"><i data-lucide="lock" class="w-4 h-4"></i> 设置密码</label>
+                <input type="password" id="password-input" placeholder="••••••••"
+                       class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none">
+                <p class="text-[10px] text-gray-400 italic mt-1">* 为了您的账号安全，严禁使用与其他用户重复的密码</p>
+            </div>
+
+            <div class="flex gap-3">
+                <button id="btn-back-2" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold py-4 rounded-xl transition-all">返回</button>
+                <button id="btn-next-2" class="flex-[2] bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl shadow-lg transition-all">确定</button>
+            </div>
+        </div>
+
+        <!-- STEP 3: Security Check -->
+        <div id="step-3" class="step-content flex-col space-y-6">
+            <div class="text-center space-y-2 mb-4">
+                <div class="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto">
+                    <i data-lucide="shield-check" class="w-8 h-8"></i>
+                </div>
+                <h3 class="font-bold text-lg">绑定邮箱</h3>
+                <p class="text-xs text-gray-500 px-4">请输入发在您提供的电子邮箱之中的验证码：<br/><span class="font-mono font-bold text-blue-600">500,000 - 600,000</span></p>
+            </div>
+
+            <div class="space-y-4">
+                <div class="flex justify-between text-[10px] font-mono text-gray-400">
+                    <span>000,000</span>
+                    <span id="slider-display" class="text-blue-500 font-bold text-[48px]">000,000</span>
+                    <span>999,999</span>
+                </div>
+                <input type="range" id="security-slider" min="0" max="999999" value="0"
+                       class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600">
+                <!--
+                <div class="h-4 bg-gray-100 rounded-full relative overflow-hidden">
+                    <div class="absolute h-full bg-blue-200" style="left: 50%; width: 10%;"></div>
+                </div>
+                -->
+            </div>
+
+            <button id="btn-submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl shadow-lg transition-all">
+                注册
+            </button>
+        </div>
+
+        <!-- STEP 4: Loading -->
+        <div id="step-4" class="step-content flex-col items-center justify-center space-y-4">
+            <i data-lucide="loader-2" class="w-12 h-12 text-blue-600 animate-spin"></i>
+            <div class="text-center">
+                <h3 class="font-bold text-lg">正在同步云端数据</h3>
+                <p class="text-sm text-gray-500">正在注册，请勿关闭页面...</p>
+            </div>
+            <div class="w-full max-w-[200px] h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                <div class="h-full bg-blue-600 animate-progress"></div>
+            </div>
+        </div>
+
+        <!-- STEP 5: Failure -->
+        <div id="step-5" class="step-content flex-col items-center justify-center space-y-6">
+            <div class="w-20 h-20 bg-red-100 text-red-600 rounded-full flex items-center justify-center animate-bounce">
+                <i data-lucide="alert-circle" class="w-10 h-10"></i>
+            </div>
+            <div class="text-center space-y-2">
+                <h3 class="text-xl font-bold text-gray-900">注册失败</h3>
+                <p class="text-sm text-gray-600 px-4">详情请查阅下方错误代码。</p>
+            </div>
+            <div class="w-full bg-gray-900 rounded-xl p-4 font-mono text-xs text-green-400 shadow-inner">
+                <p class="mb-1 opacity-50">&gt; EXEC_STATUS: FAILED</p>
+                <p class="mb-1 opacity-50">&gt; ERROR_CODE: ERR_USER_ENTROPY_INSUFFICIENT</p>
+                <p class="text-red-400 font-bold">Error: Unexpected failure during registration handshake. The requested operation was terminated by remote host (0x8004210B). Please try again after 24 hours.</p>
+            </div>
+            <button onclick="location.reload()" class="w-full border-2 border-gray-200 hover:border-blue-500 hover:text-blue-600 text-gray-500 font-bold py-4 rounded-xl transition-all">重新开始 (Retry)</button>
+        </div>
+
+    </div>
+
+    <!-- Footer -->
+    <div class="px-8 py-4 bg-gray-50 border-t border-gray-100 text-[10px] text-gray-400 flex justify-between">
+        <span>© 2026 EARTH ONLINE Registry System</span>
+        <div class="flex gap-2">
+            <a href="#" class="hover:underline">服务协议</a>
+            <a href="#" class="hover:underline">隐私策略</a>
+        </div>
+    </div>
+</div>
+
+<script src="https://unpkg.com/lucide@latest"></script>
+<script>
+    // 初始化图标
+    lucide.createIcons();
+
+    // --- 状态管理 ---
+    let currentStep = 1;
+    let nickname = "";
+    let passwordAttempts = 0;
+    let selectedKeyIndex = 0;
+    let keys = [];
+    let isCaps = false;
+    const celebrities = ["Elon Musk", "Taylor Swift", "Cristiano Ronaldo", "Bill Gates", "LeBron James", "Zendaya"];
+
+    // --- DOM 引用 ---
+    const messageBox = document.getElementById('message-box');
+    const messageText = document.getElementById('message-text');
+
+    // --- 通用函数 ---
+    function showMessage(text) {
+        messageText.innerText = text;
+        messageBox.classList.remove('hidden');
+        messageBox.classList.add('flex');
+        setTimeout(() => {
+            messageBox.classList.add('hidden');
+            messageBox.classList.remove('flex');
+        }, 3000);
+    }
+
+    function setStep(step) {
+        document.querySelectorAll('.step-content').forEach(el => el.classList.remove('active'));
+        document.getElementById(`step-${step}`).classList.add('active');
+
+        const tabs = document.querySelectorAll('.step-tab');
+        tabs.forEach((tab, i) => {
+            if (i + 1 === step) {
+                tab.className = "step-tab flex-1 py-3 text-center text-xs font-medium text-blue-600 border-b-2 border-blue-600";
+            } else if (i + 1 < step) {
+                tab.className = "step-tab flex-1 py-3 text-center text-xs font-medium text-green-500";
+            } else {
+                tab.className = "step-tab flex-1 py-3 text-center text-xs font-medium text-gray-400";
+            }
+        });
+        if (step >= 4) document.getElementById('step-indicator').style.display = 'none';
+    }
+
+    // --- 第一步：基本信息逻辑 ---
+    function initKeyboard() {
+        let charList = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".split("");
+        charList.sort(() => Math.random() - 0.5);
+        keys = [...charList, "退格", "大小写", "确定"];
+        renderKeyboard();
+    }
+
+    function renderKeyboard() {
+        const grid = document.getElementById('keyboard-grid');
+        grid.innerHTML = '';
+        keys.forEach((key, i) => {
+            const btn = document.createElement('button');
+            btn.className = `kb-key h-10 text-xs font-bold rounded flex items-center justify-center transition-all bg-gray-100 ${i === selectedKeyIndex ? 'selected' : ''}`;
+            let displayKey = key;
+            if (key === "大小写") displayKey = isCaps ? "ABC" : "abc";
+            btn.innerText = displayKey;
+            btn.onclick = () => { selectedKeyIndex = i; handleKeyInput(key); };
+            grid.appendChild(btn);
+        });
+    }
+
+    function handleKeyInput(key) {
+        if (key === "确定") {
+            if (!/\d$/.test(nickname)) {
+                showMessage("昵称已存在");
+            } else {
+                document.getElementById('virtual-keyboard').classList.add('hidden');
+            }
+        } else if (key === "退格") {
+            nickname = nickname.slice(0, -1);
+        } else if (key === "大小写") {
+            isCaps = !isCaps;
+            renderKeyboard();
+        } else {
+            nickname += isCaps ? key.toUpperCase() : key.toLowerCase();
+        }
+        document.getElementById('nickname-input').value = nickname;
+    }
+
+    // WASD 控制
+    window.addEventListener('keydown', (e) => {
+        const kb = document.getElementById('virtual-keyboard');
+        if (kb.classList.contains('hidden')) return;
+
+        const key = e.key.toLowerCase();
+        const cols = 6;
+        if (key === 'w') selectedKeyIndex = selectedKeyIndex - cols >= 0 ? selectedKeyIndex - cols : selectedKeyIndex;
+        if (key === 's') selectedKeyIndex = selectedKeyIndex + cols < keys.length ? selectedKeyIndex + cols : selectedKeyIndex;
+        if (key === 'a') selectedKeyIndex = selectedKeyIndex % cols !== 0 ? selectedKeyIndex - 1 : selectedKeyIndex;
+        if (key === 'd') selectedKeyIndex = (selectedKeyIndex + 1) % cols !== 0 && selectedKeyIndex + 1 < keys.length ? selectedKeyIndex + 1 : selectedKeyIndex;
+
+        if (e.key === 'Enter') handleKeyInput(keys[selectedKeyIndex]);
+        renderKeyboard();
+    });
+
+    document.getElementById('nickname-input').onfocus = () => {
+        initKeyboard();
+        document.getElementById('virtual-keyboard').classList.remove('hidden');
+    };
+
+    // 下拉菜单生成
+    const yearSelect = document.getElementById('year-select');
+    const monthSelect = document.getElementById('month-select');
+    const daySelect = document.getElementById('day-select');
+
+    yearSelect.innerHTML = '<option value="">年份</option>';
+    for(let y=1500; y<=2025; y++) yearSelect.innerHTML += `<option value="${y}">${y}</option>`;
+    yearSelect.innerHTML += '<option value="2026">2026</option>';
+
+    const months = Array.from({length: 12}, (_, i) => (i+1).toString()).sort();
+    monthSelect.innerHTML = '<option value="">月份</option>';
+    months.forEach(m => monthSelect.innerHTML += `<option value="${m}">${m}月</option>`);
+
+    const days = Array.from({length: 101}, (_, i) => i.toString()).sort();
+    daySelect.innerHTML = '<option value="">日期</option>';
+    days.forEach(d => daySelect.innerHTML += `<option value="${d}">${d}日</option>`);
+
+    document.getElementById('btn-next-1').onclick = () => {
+        if (!nickname || !yearSelect.value || !monthSelect.value || !daySelect.value) {
+            showMessage("请完善所有必填信息");
+            return;
+        }
+        setStep(2);
+    };
+
+    // --- 第二步：账号设置逻辑 ---
+    const emailInput = document.getElementById('email-input');
+    const celebList = document.getElementById('celeb-list');
+    const celebItems = document.getElementById('celeb-items');
+
+    emailInput.oninput = (e) => {
+        if (e.target.value.endsWith('@')) {
+            celebList.classList.remove('hidden');
+            celebItems.innerHTML = '';
+            celebrities.forEach(c => {
+                const div = document.createElement('div');
+                div.className = "px-4 py-3 hover:bg-blue-50 cursor-pointer text-sm flex items-center justify-between group";
+                div.innerHTML = `${c} <span class="text-[10px] text-gray-300 group-hover:text-blue-400">点击引用</span>`;
+                div.onclick = () => {
+                    emailInput.value = c;
+                    celebList.classList.add('hidden');
+                };
+                celebItems.appendChild(div);
+            });
+        }
+    };
+
+    document.getElementById('close-celeb').onclick = () => {
+        emailInput.value = celebrities[0];
+        celebList.classList.add('hidden');
+    };
+
+    document.getElementById('btn-back-2').onclick = () => setStep(1);
+    document.getElementById('btn-next-2').onclick = () => {
+        if (passwordAttempts < 3) {
+            passwordAttempts++;
+            showMessage("该密码已存在");
+            return;
+        }
+        setStep(3);
+    };
+
+    // --- 第三步：滑块逻辑 ---
+    const slider = document.getElementById('security-slider');
+    const sliderDisplay = document.getElementById('slider-display');
+    slider.oninput = (e) => {
+        sliderDisplay.innerText = parseInt(e.target.value).toLocaleString().padStart(7, '0');
+    };
+
+    document.getElementById('btn-submit').onclick = () => {
+        const val = parseInt(slider.value);
+        if (val >= 500000 && val <= 600000) {
+            setStep(4);
+            setTimeout(() => setStep(5), 5000);
+        } else {
+            showMessage("验证失败");
+        }
+    };
+
+</script>
+</body>
+</html>
