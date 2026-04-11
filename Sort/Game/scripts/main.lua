@@ -271,21 +271,12 @@ end
 
 local fontNormal_ = -1
 local fontBold_ = -1
-local imgRefresh_ = -1
-local imgHeadphone_ = -1
-local imgInfo_ = -1
-
 local function initNanoVG()
     nvgCtx_ = nvgCreate(1)
     if not nvgCtx_ then return end
     fontNormal_ = nvgCreateFont(nvgCtx_, "sans", "Fonts/MiSans-Regular.ttf")
     fontBold_ = nvgCreateFont(nvgCtx_, "bold", "Fonts/MiSans-Bold.ttf")
     if fontBold_ == -1 then fontBold_ = fontNormal_ end
-
-    imgRefresh_ = nvgCreateImage(nvgCtx_, "image/icon_refresh_20260411052151.png", 0)
-    imgHeadphone_ = nvgCreateImage(nvgCtx_, "image/icon_headphone_20260411052119.png", 0)
-    imgInfo_ = nvgCreateImage(nvgCtx_, "image/icon_info_20260411052133.png", 0)
-
     SubscribeToEvent(nvgCtx_, "NanoVGRender", "HandleNanoVGRender")
 end
 
@@ -424,14 +415,40 @@ local function drawFooter(ctx, cardX, cardW, footerY)
     local iconY = footerY + (footerH - iconSize) / 2
     local ix = cardX + 15
 
-    -- 刷新图标
-    if imgRefresh_ >= 0 then
-        local paint = nvgImagePattern(ctx, ix, iconY, iconSize, iconSize, 0, imgRefresh_, 1.0)
-        nvgBeginPath(ctx)
-        nvgRect(ctx, ix, iconY, iconSize, iconSize)
-        nvgFillPaint(ctx, paint)
-        nvgFill(ctx)
-    end
+    local iconColor = nvgRGBA(153, 153, 153, 255)
+
+    -- 刷新图标（两个弧形箭头）
+    local refreshCx = ix + iconSize / 2
+    local refreshCy = iconY + iconSize / 2
+    local r = iconSize * 0.38
+    nvgStrokeColor(ctx, iconColor)
+    nvgStrokeWidth(ctx, 2.0)
+    nvgLineCap(ctx, NVG_ROUND)
+    -- 上半弧
+    nvgBeginPath(ctx)
+    nvgArc(ctx, refreshCx, refreshCy, r, -math.pi * 0.8, -math.pi * 0.1, 2)
+    nvgStroke(ctx)
+    -- 上箭头
+    local ax1 = refreshCx + r * math.cos(-math.pi * 0.1)
+    local ay1 = refreshCy + r * math.sin(-math.pi * 0.1)
+    nvgBeginPath(ctx)
+    nvgMoveTo(ctx, ax1 - 3, ay1 - 4)
+    nvgLineTo(ctx, ax1, ay1)
+    nvgLineTo(ctx, ax1 + 4, ay1 - 3)
+    nvgStroke(ctx)
+    -- 下半弧
+    nvgBeginPath(ctx)
+    nvgArc(ctx, refreshCx, refreshCy, r, math.pi * 0.2, math.pi * 0.9, 2)
+    nvgStroke(ctx)
+    -- 下箭头
+    local ax2 = refreshCx + r * math.cos(math.pi * 0.9)
+    local ay2 = refreshCy + r * math.sin(math.pi * 0.9)
+    nvgBeginPath(ctx)
+    nvgMoveTo(ctx, ax2 + 3, ay2 + 4)
+    nvgLineTo(ctx, ax2, ay2)
+    nvgLineTo(ctx, ax2 - 4, ay2 + 3)
+    nvgStroke(ctx)
+
     REFRESH_BTN.x = ix - 4
     REFRESH_BTN.y = footerY
     REFRESH_BTN.w = iconSize + 8
@@ -439,27 +456,44 @@ local function drawFooter(ctx, cardX, cardW, footerY)
 
     -- 耳机图标
     local ix2 = ix + iconSize + iconGap
-    if imgHeadphone_ >= 0 then
-        local paint = nvgImagePattern(ctx, ix2, iconY, iconSize, iconSize, 0, imgHeadphone_, 1.0)
-        nvgBeginPath(ctx)
-        nvgRect(ctx, ix2, iconY, iconSize, iconSize)
-        nvgFillPaint(ctx, paint)
-        nvgFill(ctx)
-    end
+    local hCx = ix2 + iconSize / 2
+    local hCy = iconY + iconSize / 2
+    local hr = iconSize * 0.38
+    nvgStrokeColor(ctx, iconColor)
+    nvgStrokeWidth(ctx, 2.0)
+    -- 头带弧
+    nvgBeginPath(ctx)
+    nvgArc(ctx, hCx, hCy + 2, hr, -math.pi, 0, 2)
+    nvgStroke(ctx)
+    -- 左耳罩
+    nvgBeginPath(ctx)
+    nvgFillColor(ctx, iconColor)
+    nvgRoundedRect(ctx, hCx - hr - 2, hCy - 1, 5, 9, 1.5)
+    nvgFill(ctx)
+    -- 右耳罩
+    nvgBeginPath(ctx)
+    nvgRoundedRect(ctx, hCx + hr - 3, hCy - 1, 5, 9, 1.5)
+    nvgFill(ctx)
 
-    -- 信息图标
+    -- 信息图标（实心圆 + 白色 i）
     local ix3 = ix2 + iconSize + iconGap
-    if imgInfo_ >= 0 then
-        local paint = nvgImagePattern(ctx, ix3, iconY, iconSize, iconSize, 0, imgInfo_, 1.0)
-        nvgBeginPath(ctx)
-        nvgRect(ctx, ix3, iconY, iconSize, iconSize)
-        nvgFillPaint(ctx, paint)
-        nvgFill(ctx)
-    end
+    local iCx = ix3 + iconSize / 2
+    local iCy = iconY + iconSize / 2
+    local ir = iconSize * 0.38
+    nvgBeginPath(ctx)
+    nvgCircle(ctx, iCx, iCy, ir)
+    nvgFillColor(ctx, iconColor)
+    nvgFill(ctx)
+    -- 白色 i
+    nvgFontFace(ctx, "bold")
+    nvgFontSize(ctx, iconSize * 0.55)
+    nvgTextAlign(ctx, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
+    nvgFillColor(ctx, nvgRGBA(255, 255, 255, 255))
+    nvgText(ctx, iCx, iCy + 1, "i", nil)
 
     local btnText = "验证"
-    local btnPadX = 20
-    local btnPadY = 10
+    local btnPadX = 16
+    local btnPadY = 5
     nvgFontFace(ctx, "bold")
     nvgFontSize(ctx, 14)
     local _, bounds = nvgTextBounds(ctx, 0, 0, btnText)
@@ -467,7 +501,7 @@ local function drawFooter(ctx, cardX, cardW, footerY)
     local btnW = textW + btnPadX * 2
     local btnH = 14 + btnPadY * 2
     local btnX = cardX + cardW - 15 - btnW
-    local btnY = iconY - btnH / 2
+    local btnY = footerY + (footerH - btnH) / 2
 
     nvgBeginPath(ctx)
     nvgRoundedRect(ctx, btnX, btnY, btnW, btnH, 3)
