@@ -377,8 +377,7 @@ local function drawFooter(ctx, cardX, cardW, footerY)
     nvgFontSize(ctx, 14)
 
     -- 测量文字宽度
-    local bounds = {}
-    nvgTextBounds(ctx, 0, 0, btnText, nil, bounds)
+    local advance, bounds = nvgTextBounds(ctx, 0, 0, btnText)
     local textW = bounds[3] - bounds[1]
 
     local btnW = textW + btnPadX * 2
@@ -461,9 +460,8 @@ local function drawOverlay(ctx)
         local retryText = "再次尝试"
         nvgFontFace(ctx, "bold")
         nvgFontSize(ctx, 14)
-        local bounds = {}
-        nvgTextBounds(ctx, 0, 0, retryText, nil, bounds)
-        local tw = bounds[3] - bounds[1]
+        local _, retryBounds = nvgTextBounds(ctx, 0, 0, retryText)
+        local tw = retryBounds[3] - retryBounds[1]
         local rbtnW = tw + 40
         local rbtnH = 34
         local rbtnX = cx - rbtnW / 2
