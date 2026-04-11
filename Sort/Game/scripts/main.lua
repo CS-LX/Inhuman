@@ -85,8 +85,10 @@ local NOTE_FILES = {
 }
 ---@type Scene|nil
 local sfxScene_ = nil
----@type SoundSource|nil
-local sfxSource_ = nil
+---@type SoundSource[]
+local sfxSources_ = {}
+local SFX_POOL_SIZE = 6
+local sfxPoolIndex_ = 0
 ---@type Sound[]
 local noteSounds_ = {}
 
@@ -135,13 +137,13 @@ local function pointInRect(px, py, rx, ry, rw, rh)
     return px >= rx and px <= rx + rw and py >= ry and py <= ry + rh
 end
 
---- 播放指定槽位的音符
+--- 播放指定槽位的音符（轮流使用不同 SoundSource，避免截断爆音）
 local function playSlotNote(slotIndex)
     if slotIndex < 1 or slotIndex > #noteSounds_ then return end
-    if sfxSource_ and noteSounds_[slotIndex] then
-        sfxSource_:Play(noteSounds_[slotIndex], 0, 0.5)
-        print("[SFX] Play slot " .. slotIndex)
-    end
+    if #sfxSources_ == 0 or not noteSounds_[slotIndex] then return end
+    sfxPoolIndex_ = (sfxPoolIndex_ % SFX_POOL_SIZE) + 1
+    local src = sfxSources_[sfxPoolIndex_]
+    src:Play(noteSounds_[slotIndex], 0, 0.5)
 end
 
 -- ============================================================================
@@ -821,15 +823,15 @@ function Start()
         local snd = cache:GetResource("Sound", path)
         if snd then
             noteSounds_[i] = snd
-            print("[SFX] Loaded: " .. path)
-        else
-            print("[SFX] FAILED to load: " .. path)
         end
     end
-    local sfxNode = sfxScene_:CreateChild("SFX")
-    sfxSource_ = sfxNode:CreateComponent("SoundSource")
-    sfxSource_:SetSoundType("Effect")
-    print("[SFX] Source ready, loaded " .. #noteSounds_ .. " notes")
+    -- 创建 SoundSource 池，轮流播放避免截断爆音
+    for i = 1, SFX_POOL_SIZE do
+        local sfxNode = sfxScene_:CreateChild("SFX_" .. i)
+        local src = sfxNode:CreateComponent("SoundSource")
+        src:SetSoundType("Effect")
+        sfxSources_[i] = src
+    end
 
     uiRoot_ = UI.Panel {
         id = "root",
