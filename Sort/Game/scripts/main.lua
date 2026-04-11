@@ -58,6 +58,7 @@ local DRAG = {
     currentX    = 0,
     currentY    = 0,
     originX     = 0,         -- 拖拽开始时柱子的目标X
+    lastSlot    = -1,        -- 上次经过的槽位（用于触发音效）
 }
 
 local SCREEN = { w = 0, h = 0, dpr = 1, logW = 0, logH = 0 }
@@ -68,6 +69,24 @@ local BARS_LAYOUT = { startX = 0, gap = 0, bottomY = 0 }
 
 -- 上一帧时间戳（用于动画 dt）
 local lastTime_ = 0
+
+-- 音符音效
+local NOTE_FILES = {
+    "audio/sfx/note_01_do.ogg",
+    "audio/sfx/note_02_re.ogg",
+    "audio/sfx/note_03_mi.ogg",
+    "audio/sfx/note_04_fa.ogg",
+    "audio/sfx/note_05_sol.ogg",
+    "audio/sfx/note_06_la.ogg",
+    "audio/sfx/note_07_ti.ogg",
+    "audio/sfx/note_08_do2.ogg",
+    "audio/sfx/note_09_re2.ogg",
+    "audio/sfx/note_10_mi2.ogg",
+}
+---@type SoundSource|nil
+local sfxSource_ = nil
+---@type Sound[]
+local noteSounds_ = {}
 
 -- ============================================================================
 -- 颜色 (对齐 HTML)
@@ -112,6 +131,14 @@ end
 
 local function pointInRect(px, py, rx, ry, rw, rh)
     return px >= rx and px <= rx + rw and py >= ry and py <= ry + rh
+end
+
+--- 播放指定槽位的音符
+local function playSlotNote(slotIndex)
+    if slotIndex < 1 or slotIndex > #noteSounds_ then return end
+    if sfxSource_ and noteSounds_[slotIndex] then
+        sfxSource_:Play(noteSounds_[slotIndex])
+    end
 end
 
 -- ============================================================================
@@ -681,6 +708,8 @@ local function handlePointerDown(lx, ly)
         DRAG.currentX = lx
         DRAG.currentY = ly
         DRAG.originX = slotTargetX(idx)
+        DRAG.lastSlot = idx
+        playSlotNote(idx)
     end
 end
 
@@ -692,6 +721,13 @@ local function handlePointerMove(lx, ly)
     DRAG.currentY = ly
 
     local targetIdx = getBarIndexAtPos(lx)
+
+    -- 检测槽位变化，播放对应音符
+    if targetIdx >= 1 and targetIdx ~= DRAG.lastSlot then
+        DRAG.lastSlot = targetIdx
+        playSlotNote(targetIdx)
+    end
+
     if targetIdx >= 1 and targetIdx ~= DRAG.barIndex then
         STATE.bars[DRAG.barIndex], STATE.bars[targetIdx] = STATE.bars[targetIdx], STATE.bars[DRAG.barIndex]
         DRAG.barIndex = targetIdx
@@ -703,6 +739,7 @@ local function handlePointerUp()
     if DRAG.active then
         DRAG.active = false
         DRAG.barIndex = -1
+        DRAG.lastSlot = -1
     end
 end
 
@@ -774,6 +811,15 @@ function Start()
     })
 
     initNanoVG()
+
+    -- 加载音符音效
+    local sfxScene = Scene()
+    for i, path in ipairs(NOTE_FILES) do
+        noteSounds_[i] = cache:GetResource("Sound", path)
+    end
+    local sfxNode = sfxScene:CreateChild("SFX")
+    sfxSource_ = sfxNode:CreateComponent("SoundSource")
+    sfxSource_:SetSoundType("Effect")
 
     uiRoot_ = UI.Panel {
         id = "root",
