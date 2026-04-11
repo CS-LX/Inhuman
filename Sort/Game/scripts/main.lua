@@ -72,17 +72,19 @@ local lastTime_ = 0
 
 -- 音符音效
 local NOTE_FILES = {
-    "audio/sfx/note_01_do.ogg",
-    "audio/sfx/note_02_re.ogg",
-    "audio/sfx/note_03_mi.ogg",
-    "audio/sfx/note_04_fa.ogg",
-    "audio/sfx/note_05_sol.ogg",
-    "audio/sfx/note_06_la.ogg",
-    "audio/sfx/note_07_ti.ogg",
-    "audio/sfx/note_08_do2.ogg",
-    "audio/sfx/note_09_re2.ogg",
-    "audio/sfx/note_10_mi2.ogg",
+    "audio/c4.ogg",   -- do
+    "audio/d4.ogg",   -- re
+    "audio/e4.ogg",   -- mi
+    "audio/f4.ogg",   -- fa
+    "audio/g4.ogg",   -- sol
+    "audio/a4.ogg",   -- la
+    "audio/b4.ogg",   -- ti
+    "audio/c5.ogg",   -- do'
+    "audio/d5.ogg",   -- re'
+    "audio/e5.ogg",   -- mi'
 }
+---@type Scene|nil
+local sfxScene_ = nil
 ---@type SoundSource|nil
 local sfxSource_ = nil
 ---@type Sound[]
@@ -137,7 +139,8 @@ end
 local function playSlotNote(slotIndex)
     if slotIndex < 1 or slotIndex > #noteSounds_ then return end
     if sfxSource_ and noteSounds_[slotIndex] then
-        sfxSource_:Play(noteSounds_[slotIndex])
+        sfxSource_:Play(noteSounds_[slotIndex], 0, 0.5)
+        print("[SFX] Play slot " .. slotIndex)
     end
 end
 
@@ -813,13 +816,20 @@ function Start()
     initNanoVG()
 
     -- 加载音符音效
-    local sfxScene = Scene()
+    sfxScene_ = Scene()
     for i, path in ipairs(NOTE_FILES) do
-        noteSounds_[i] = cache:GetResource("Sound", path)
+        local snd = cache:GetResource("Sound", path)
+        if snd then
+            noteSounds_[i] = snd
+            print("[SFX] Loaded: " .. path)
+        else
+            print("[SFX] FAILED to load: " .. path)
+        end
     end
-    local sfxNode = sfxScene:CreateChild("SFX")
+    local sfxNode = sfxScene_:CreateChild("SFX")
     sfxSource_ = sfxNode:CreateComponent("SoundSource")
     sfxSource_:SetSoundType("Effect")
+    print("[SFX] Source ready, loaded " .. #noteSounds_ .. " notes")
 
     uiRoot_ = UI.Panel {
         id = "root",
