@@ -1,0 +1,38 @@
+# ============================================
+# roBOTCHA 排序验证游戏 - Git 忽略规则
+# ============================================
+
+# --- 构建产物 / 缓存 ---
+dist/
+.build/
+.tmp/
+
+# --- 引擎 / 编辑器配置 ---
+.project/
+.claude/
+.emmylua/
+
+# --- 引擎内部资源（只读，不属于游戏源码）---
+engine-docs/
+examples/
+templates/
+urhox-libs/
+lua-tools/
+schemas/
+prompts/
+
+# --- 日志 ---
+logs/
+*.log
+
+# --- 系统文件 ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- 编辑器 ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
