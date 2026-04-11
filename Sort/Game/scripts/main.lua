@@ -271,6 +271,9 @@ end
 
 local fontNormal_ = -1
 local fontBold_ = -1
+local imgRefresh_ = -1
+local imgHeadphone_ = -1
+local imgInfo_ = -1
 
 local function initNanoVG()
     nvgCtx_ = nvgCreate(1)
@@ -278,6 +281,11 @@ local function initNanoVG()
     fontNormal_ = nvgCreateFont(nvgCtx_, "sans", "Fonts/MiSans-Regular.ttf")
     fontBold_ = nvgCreateFont(nvgCtx_, "bold", "Fonts/MiSans-Bold.ttf")
     if fontBold_ == -1 then fontBold_ = fontNormal_ end
+
+    imgRefresh_ = nvgCreateImage(nvgCtx_, "image/icon_refresh_20260411052151.png", 0)
+    imgHeadphone_ = nvgCreateImage(nvgCtx_, "image/icon_headphone_20260411052119.png", 0)
+    imgInfo_ = nvgCreateImage(nvgCtx_, "image/icon_info_20260411052133.png", 0)
+
     SubscribeToEvent(nvgCtx_, "NanoVGRender", "HandleNanoVGRender")
 end
 
@@ -411,20 +419,43 @@ local function drawFooter(ctx, cardX, cardW, footerY)
     nvgStrokeWidth(ctx, 1)
     nvgStroke(ctx)
 
-    local iconY = footerY + footerH / 2
+    local iconSize = 22
+    local iconGap = 12
+    local iconY = footerY + (footerH - iconSize) / 2
     local ix = cardX + 15
 
-    nvgFontFace(ctx, "sans")
-    nvgFontSize(ctx, 20)
-    nvgTextAlign(ctx, NVG_ALIGN_LEFT + NVG_ALIGN_MIDDLE)
-    nvgFillColor(ctx, nvgRGBA(table.unpack(C.iconGray)))
-    nvgText(ctx, ix, iconY, "🔄", nil)
+    -- 刷新图标
+    if imgRefresh_ >= 0 then
+        local paint = nvgImagePattern(ctx, ix, iconY, iconSize, iconSize, 0, imgRefresh_, 1.0)
+        nvgBeginPath(ctx)
+        nvgRect(ctx, ix, iconY, iconSize, iconSize)
+        nvgFillPaint(ctx, paint)
+        nvgFill(ctx)
+    end
     REFRESH_BTN.x = ix - 4
     REFRESH_BTN.y = footerY
-    REFRESH_BTN.w = 28
+    REFRESH_BTN.w = iconSize + 8
     REFRESH_BTN.h = footerH
-    nvgText(ctx, ix + 35, iconY, "🎧", nil)
-    nvgText(ctx, ix + 70, iconY, "ⓘ", nil)
+
+    -- 耳机图标
+    local ix2 = ix + iconSize + iconGap
+    if imgHeadphone_ >= 0 then
+        local paint = nvgImagePattern(ctx, ix2, iconY, iconSize, iconSize, 0, imgHeadphone_, 1.0)
+        nvgBeginPath(ctx)
+        nvgRect(ctx, ix2, iconY, iconSize, iconSize)
+        nvgFillPaint(ctx, paint)
+        nvgFill(ctx)
+    end
+
+    -- 信息图标
+    local ix3 = ix2 + iconSize + iconGap
+    if imgInfo_ >= 0 then
+        local paint = nvgImagePattern(ctx, ix3, iconY, iconSize, iconSize, 0, imgInfo_, 1.0)
+        nvgBeginPath(ctx)
+        nvgRect(ctx, ix3, iconY, iconSize, iconSize)
+        nvgFillPaint(ctx, paint)
+        nvgFill(ctx)
+    end
 
     local btnText = "验证"
     local btnPadX = 20
