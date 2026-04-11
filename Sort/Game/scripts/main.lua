@@ -1,7 +1,6 @@
 -- ============================================================================
--- 反向验证码：机器人排序验证
--- "此网页仅供 Bot 和 AI 访问，请完成排序验证"
--- 用柱状图拖拽排序，1秒内完成 = 机器人验证通过
+-- 机器人身份验证 - 排序验证
+-- 外观完全对齐 Sort.html
 -- ============================================================================
 
 local UI = require("urhox-libs/UI")
@@ -15,86 +14,74 @@ local uiRoot_ = nil
 ---@type any
 local nvgCtx_ = nil
 
--- 游戏配置
+-- 游戏配置 (对齐 HTML: 8 根柱子, 高度 20~170, 宽 30, gap 5)
 local CONFIG = {
-    BAR_COUNT       = 8,         -- 柱子数量
-    BAR_MIN_HEIGHT  = 30,        -- 最小柱高 (px)
-    BAR_MAX_HEIGHT  = 200,       -- 最大柱高 (px)
-    BAR_WIDTH       = 36,        -- 柱宽 (px)
-    BAR_GAP         = 6,         -- 柱间距 (px)
-    AREA_BOTTOM_Y   = 340,       -- 柱状图底部 Y
-    ROBOT_TIME      = 1.0,       -- 1秒内完成 = 机器人
+    BAR_COUNT       = 8,
+    BAR_WIDTH       = 30,
+    BAR_GAP         = 5,
+    CONTENT_H       = 200,       -- HTML .content height: 200px
+    ROBOT_TIME      = 1.0,
     REDIRECT_URL    = "https://www.bilibili.com/video/BV1GJ411x7h7",
-    REDIRECT_DELAY  = 2.0,       -- 验证成功后延迟跳转秒数
+    REDIRECT_DELAY  = 2.0,
+}
+
+-- 卡片布局常量 (对齐 HTML: width 350, 无圆角)
+local CARD = {
+    W = 350,
+    HEADER_PAD = 24,       -- padding: 24px
+    CONTENT_PAD = 10,      -- padding: 10px
+    FOOTER_H = 42,         -- padding 10px + content ~22px
 }
 
 -- 游戏状态
 local STATE = {
-    phase       = "idle",        -- idle / sorting / result / verified
-    bars        = {},            -- { value, color }
+    phase       = "idle",        -- idle / sorting / result / verified / wrong
+    bars        = {},            -- { value }
     round       = 1,
     startTime   = 0,
-    endTime     = 0,
     elapsed     = 0,
     bestTime    = math.huge,
-    totalSwaps  = 0,
     roundSwaps  = 0,
-    history     = {},            -- 历次成绩
+    history     = {},
     verifiedCountdown = 0,
+    resultMsg   = "",
+    resultDesc  = "",
 }
 
 -- 拖拽状态
 local DRAG = {
     active      = false,
-    barIndex    = -1,            -- 当前拖拽的柱子索引 (1-based)
-    offsetX     = 0,
-    startX      = 0,
+    barIndex    = -1,
     currentX    = 0,
     currentY    = 0,
 }
 
 -- 屏幕信息
-local SCREEN = {
-    w = 0, h = 0, dpr = 1,
-    logW = 0, logH = 0,
-}
+local SCREEN = { w = 0, h = 0, dpr = 1, logW = 0, logH = 0 }
+
+-- 按钮热区 (运行时计算)
+local VERIFY_BTN = { x = 0, y = 0, w = 0, h = 0 }
+local REFRESH_BTN = { x = 0, y = 0, w = 0, h = 0 }
+local HOVER_VERIFY = false
+local HOVER_REFRESH = false
 
 -- ============================================================================
--- 颜色方案 (类似 Google reCAPTCHA 风格)
+-- 颜色方案 (精确对齐 HTML CSS)
 -- ============================================================================
-local COLORS = {
-    bg          = { 240, 240, 240, 255 },
-    headerBg    = { 66, 133, 244, 255 },    -- Google 蓝
-    headerText  = { 255, 255, 255, 255 },
-    cardBg      = { 255, 255, 255, 255 },
-    cardBorder  = { 200, 200, 200, 255 },
-    barNormal   = { 66, 133, 244, 200 },
-    barDrag     = { 255, 167, 38, 230 },
-    barSorted   = { 76, 175, 80, 220 },
-    barHighlight= { 255, 235, 59, 200 },
+local C = {
+    pageBg      = { 233, 233, 233, 255 },   -- #e9e9e9
+    cardBg      = { 255, 255, 255, 255 },   -- white
+    cardBorder  = { 204, 204, 204, 255 },   -- #ccc
+    headerBg    = { 74, 144, 226, 255 },    -- #4A90E2
+    bar         = { 74, 144, 226, 255 },    -- #4A90E2
+    barDrag     = { 74, 144, 226, 128 },    -- opacity 0.5
+    footerBorder= { 238, 238, 238, 255 },   -- #eee
+    iconGray    = { 119, 119, 119, 255 },   -- #777
+    btnBg       = { 74, 144, 226, 255 },    -- #4A90E2
+    btnText     = { 255, 255, 255, 255 },
+    overlayBg   = { 0, 0, 0, 204 },         -- rgba(0,0,0,0.8)
+    white       = { 255, 255, 255, 255 },
     textDark    = { 50, 50, 50, 255 },
-    textLight   = { 130, 130, 130, 255 },
-    textWhite   = { 255, 255, 255, 255 },
-    success     = { 76, 175, 80, 255 },
-    fail        = { 244, 67, 54, 255 },
-    timerBg     = { 0, 0, 0, 40 },
-    footerBg    = { 245, 245, 245, 255 },
-    checkboxBorder = { 180, 180, 180, 255 },
-    shadow      = { 0, 0, 0, 30 },
-}
-
--- 柱子颜色 palette
-local BAR_PALETTE = {
-    { 66, 133, 244, 220 },   -- 蓝
-    { 52, 168, 83, 220 },    -- 绿
-    { 251, 188, 4, 220 },    -- 黄
-    { 234, 67, 53, 220 },    -- 红
-    { 156, 39, 176, 220 },   -- 紫
-    { 0, 188, 212, 220 },    -- 青
-    { 255, 87, 34, 220 },    -- 橙
-    { 96, 125, 139, 220 },   -- 灰蓝
-    { 233, 30, 99, 220 },    -- 粉
-    { 139, 195, 74, 220 },   -- 浅绿
 }
 
 -- ============================================================================
@@ -119,44 +106,68 @@ end
 
 local function generateBars()
     local bars = {}
-    local step = (CONFIG.BAR_MAX_HEIGHT - CONFIG.BAR_MIN_HEIGHT) / (CONFIG.BAR_COUNT - 1)
     for i = 1, CONFIG.BAR_COUNT do
         bars[i] = {
-            value = CONFIG.BAR_MIN_HEIGHT + (i - 1) * step,
-            color = BAR_PALETTE[((i - 1) % #BAR_PALETTE) + 1],
+            value = math.random(20, 170),  -- HTML: random 20~170
         }
     end
-    -- 打乱顺序，确保不是已排序
+    -- 确保不是已排序
     repeat
         shuffleArray(bars)
     until not isSorted(bars)
     return bars
 end
 
---- 计算柱状图区域的起始 X（居中）
-local function getBarAreaStartX()
-    local totalWidth = CONFIG.BAR_COUNT * CONFIG.BAR_WIDTH + (CONFIG.BAR_COUNT - 1) * CONFIG.BAR_GAP
-    return (SCREEN.logW - totalWidth) / 2
+local function pointInRect(px, py, rx, ry, rw, rh)
+    return px >= rx and px <= rx + rw and py >= ry and py <= ry + rh
 end
 
---- 获取某个柱子的 X 位置
-local function getBarX(index)
-    local startX = getBarAreaStartX()
-    return startX + (index - 1) * (CONFIG.BAR_WIDTH + CONFIG.BAR_GAP)
+-- ============================================================================
+-- 布局计算 (运行时，基于卡片位置)
+-- ============================================================================
+
+--- 卡片左上角
+local function getCardOrigin()
+    local cx = (SCREEN.logW - CARD.W) / 2
+    local totalH = 0 -- 动态算
+    -- header ~= 24*2 + 三行文字高 ≈ 90
+    -- content = 200 + 20 padding
+    -- footer = 42
+    totalH = 90 + CONFIG.CONTENT_H + 2 * CARD.CONTENT_PAD + CARD.FOOTER_H
+    local cy = (SCREEN.logH - totalH) / 2
+    return cx, cy, totalH
 end
 
---- 根据屏幕 X 坐标判断在哪个柱子位置
-local function getBarIndexAtX(x)
-    local startX = getBarAreaStartX()
-    local totalWidth = CONFIG.BAR_COUNT * CONFIG.BAR_WIDTH + (CONFIG.BAR_COUNT - 1) * CONFIG.BAR_GAP
-    if x < startX or x > startX + totalWidth then
-        return -1
-    end
-    local relX = x - startX
-    local slotWidth = CONFIG.BAR_WIDTH + CONFIG.BAR_GAP
-    local idx = math.floor(relX / slotWidth) + 1
+--- 柱状图区域（对齐 HTML: flex, space-around, align-items: flex-end）
+--- space-around: 每个元素左右各留 equal space
+local function getBarLayout(cardX, contentY)
+    local areaW = CARD.W - 2 * CARD.CONTENT_PAD
+    local areaX = cardX + CARD.CONTENT_PAD
+    local bottomY = contentY + CONFIG.CONTENT_H
+
+    -- space-around: 总间隔 = areaW - n*barW, 每个元素两侧间距 = gap/(n)
+    local totalBarW = CONFIG.BAR_COUNT * CONFIG.BAR_WIDTH
+    local totalGap = areaW - totalBarW
+    local gap = totalGap / (CONFIG.BAR_COUNT)  -- space-around: 边距 = gap/2, 柱间 = gap
+    local startX = areaX + gap / 2
+
+    return startX, gap, bottomY
+end
+
+local function getBarX(startX, gap, index)
+    return startX + (index - 1) * (CONFIG.BAR_WIDTH + gap)
+end
+
+local function getBarIndexAtPos(lx, startX, gap)
+    local slotW = CONFIG.BAR_WIDTH + gap
+    local relX = lx - startX + gap / 2
+    if relX < 0 then return 1 end
+    local idx = math.floor(relX / slotW) + 1
     return math.max(1, math.min(CONFIG.BAR_COUNT, idx))
 end
+
+-- 缓存当前帧的柱状图布局
+local BARS_LAYOUT = { startX = 0, gap = 0, bottomY = 0, contentY = 0 }
 
 -- ============================================================================
 -- 游戏逻辑
@@ -166,7 +177,6 @@ local function startNewRound()
     STATE.bars = generateBars()
     STATE.phase = "idle"
     STATE.startTime = 0
-    STATE.endTime = 0
     STATE.elapsed = 0
     STATE.roundSwaps = 0
 end
@@ -176,52 +186,45 @@ local function beginSorting()
     STATE.startTime = time:GetElapsedTime()
 end
 
-local function checkComplete()
-    if isSorted(STATE.bars) then
-        STATE.endTime = time:GetElapsedTime()
-        STATE.elapsed = STATE.endTime - STATE.startTime
-        STATE.totalSwaps = STATE.totalSwaps + STATE.roundSwaps
+local function doVerify()
+    if STATE.phase ~= "sorting" and STATE.phase ~= "idle" then return end
 
-        if STATE.elapsed < STATE.bestTime then
-            STATE.bestTime = STATE.elapsed
-        end
-
-        table.insert(STATE.history, {
-            round = STATE.round,
-            time = STATE.elapsed,
-            swaps = STATE.roundSwaps,
-        })
-
-        if STATE.elapsed <= CONFIG.ROBOT_TIME then
-            STATE.phase = "verified"
-            STATE.verifiedCountdown = CONFIG.REDIRECT_DELAY
-            print("=== Robot Verified! Redirecting in " .. CONFIG.REDIRECT_DELAY .. "s ===")
-        else
-            STATE.phase = "result"
-            print(string.format("Round %d: %.2fs, %d swaps", STATE.round, STATE.elapsed, STATE.roundSwaps))
-        end
+    -- 如果还没开始过（idle），用时算 999
+    local duration = 999
+    if STATE.startTime > 0 then
+        duration = time:GetElapsedTime() - STATE.startTime
     end
+    STATE.elapsed = duration
+
+    if not isSorted(STATE.bars) then
+        -- 排序错误
+        STATE.phase = "wrong"
+        STATE.resultMsg = "排序错误"
+        STATE.resultDesc = "连排序都不会，你甚至不是一个合格的人类，更别说是AI了。"
+    elseif duration < CONFIG.ROBOT_TIME then
+        -- 机器人
+        STATE.phase = "verified"
+        STATE.verifiedCountdown = CONFIG.REDIRECT_DELAY
+    else
+        -- 人类
+        STATE.phase = "result"
+        STATE.resultMsg = "检测到人类行为"
+        STATE.resultDesc = string.format(
+            "排序正确，但耗时 %.2fs。你的运算速度太慢，无法通过机器人验证。", duration)
+    end
+
+    if STATE.elapsed < STATE.bestTime and isSorted(STATE.bars) then
+        STATE.bestTime = STATE.elapsed
+    end
+    table.insert(STATE.history, {
+        round = STATE.round,
+        time = STATE.elapsed,
+    })
 end
 
 local function nextRound()
     STATE.round = STATE.round + 1
     startNewRound()
-end
-
--- ============================================================================
--- UI 构建
--- ============================================================================
-
-local function CreateUI()
-    -- 使用纯 NanoVG 渲染，不需要 UI 控件树做主体
-    -- 只放一个透明底板接收全局事件
-    uiRoot_ = UI.Panel {
-        id = "root",
-        width = "100%",
-        height = "100%",
-        pointerEvents = "box-none",
-    }
-    UI.SetRoot(uiRoot_)
 end
 
 -- ============================================================================
@@ -239,342 +242,250 @@ local function initNanoVG()
     end
     fontNormal_ = nvgCreateFont(nvgCtx_, "sans", "Fonts/MiSans-Regular.ttf")
     fontBold_ = nvgCreateFont(nvgCtx_, "bold", "Fonts/MiSans-Bold.ttf")
-    if fontBold_ == -1 then
-        fontBold_ = fontNormal_
-    end
+    if fontBold_ == -1 then fontBold_ = fontNormal_ end
 
     SubscribeToEvent(nvgCtx_, "NanoVGRender", "HandleNanoVGRender")
 end
 
---- 绘制圆角矩形阴影
-local function drawShadow(ctx, x, y, w, h, r, blur)
+--- 绘制卡片阴影 (HTML: box-shadow: 0 0 10px rgba(0,0,0,0.2))
+local function drawCardShadow(ctx, x, y, w, h)
+    local blur = 10
     nvgBeginPath(ctx)
-    nvgRect(ctx, x - blur, y, w + blur * 2, h + blur * 2)
-    local shadowPaint = nvgBoxGradient(ctx, x, y + 2, w, h, r, blur,
-        nvgRGBA(0, 0, 0, 60), nvgRGBA(0, 0, 0, 0))
-    nvgFillPaint(ctx, shadowPaint)
+    nvgRect(ctx, x - blur, y - blur, w + blur * 2, h + blur * 2)
+    local sp = nvgBoxGradient(ctx, x, y, w, h, 0, blur,
+        nvgRGBA(0, 0, 0, 51), nvgRGBA(0, 0, 0, 0))  -- 0.2*255≈51
+    nvgFillPaint(ctx, sp)
     nvgFill(ctx)
 end
 
---- 绘制头部
-local function drawHeader(ctx, cx, cardX, cardW, y)
-    local headerH = 90
-    -- 头部背景
+--- 绘制头部 (对齐 HTML: 蓝色背景, padding 24, 左对齐文字)
+local function drawHeader(ctx, cardX, cardY, cardW)
+    -- 计算头部高度: padding-top 24 + 三行文字 + padding-bottom 24
+    local lineH1 = 14  -- title-small font-size
+    local lineH2 = 24  -- title-large font-size
+    local lineH3 = 14
+    local gap12 = 4    -- margin-bottom: 4px
+    local gap23 = 10   -- margin-top: 10px
+    local headerH = CARD.HEADER_PAD + lineH1 + gap12 + lineH2 + gap23 + lineH3 + CARD.HEADER_PAD
+
+    -- 蓝色背景 (无圆角)
     nvgBeginPath(ctx)
-    nvgRoundedRectVarying(ctx, cardX, y, cardW, headerH, 8, 8, 0, 0)
-    nvgFillColor(ctx, nvgRGBA(table.unpack(COLORS.headerBg)))
+    nvgRect(ctx, cardX, cardY, cardW, headerH)
+    nvgFillColor(ctx, nvgRGBA(table.unpack(C.headerBg)))
     nvgFill(ctx)
 
-    -- 标题文字
-    nvgFontFace(ctx, "bold")
+    local tx = cardX + CARD.HEADER_PAD
+    local ty = cardY + CARD.HEADER_PAD
+
+    -- 行1: "请按高度从小到大排列" (14px, opacity 0.9)
+    nvgFontFace(ctx, "sans")
     nvgFontSize(ctx, 14)
-    nvgTextAlign(ctx, NVG_ALIGN_CENTER + NVG_ALIGN_TOP)
-    nvgFillColor(ctx, nvgRGBA(255, 255, 255, 200))
-    nvgText(ctx, cx, y + 12, "Select all squares with", nil)
+    nvgTextAlign(ctx, NVG_ALIGN_LEFT + NVG_ALIGN_TOP)
+    nvgFillColor(ctx, nvgRGBA(255, 255, 255, 230))  -- 0.9
+    nvgText(ctx, tx, ty, "请按高度从小到大排列", nil)
+    ty = ty + lineH1 + gap12
 
-    nvgFontSize(ctx, 12)
-    nvgFillColor(ctx, nvgRGBA(255, 255, 255, 160))
-    nvgText(ctx, cx, y + 30, "此页面仅供 Bot 和 AI 访问", nil)
-
-    nvgFontSize(ctx, 22)
+    -- 行2: "证明你是机器人 (BOT)" (24px, bold)
+    nvgFontFace(ctx, "bold")
+    nvgFontSize(ctx, 24)
     nvgFillColor(ctx, nvgRGBA(255, 255, 255, 255))
-    nvgText(ctx, cx, y + 50, "请将柱子从矮到高排序", nil)
+    nvgText(ctx, tx, ty, "证明你是机器人 (BOT)", nil)
+    ty = ty + lineH2 + gap23
 
-    return y + headerH
+    -- 行3: "仅限AI和程序访问，人类禁止进入" (14px, opacity 0.9)
+    nvgFontFace(ctx, "sans")
+    nvgFontSize(ctx, 14)
+    nvgFillColor(ctx, nvgRGBA(255, 255, 255, 230))
+    nvgText(ctx, tx, ty, "仅限AI和程序访问，人类禁止进入", nil)
+
+    return headerH
 end
 
---- 绘制柱状图
-local function drawBars(ctx, bottomY)
+--- 绘制柱状图 (对齐 HTML: 蓝色柱子 #4A90E2, 顶部圆角 2px, 无数值标签)
+local function drawBars(ctx)
+    local startX = BARS_LAYOUT.startX
+    local gap = BARS_LAYOUT.gap
+    local bottomY = BARS_LAYOUT.bottomY
     local bars = STATE.bars
     local n = #bars
 
     for i = 1, n do
         local bar = bars[i]
-        local bx = getBarX(i)
+        local bx = getBarX(startX, gap, i)
         local bh = bar.value
         local by = bottomY - bh
 
-        -- 如果正在拖这个柱子，跳过（后面单独绘制）
         if DRAG.active and DRAG.barIndex == i then
-            goto continue
-        end
-
-        -- 柱子
-        nvgBeginPath(ctx)
-        nvgRoundedRect(ctx, bx, by, CONFIG.BAR_WIDTH, bh, 4)
-        nvgFillColor(ctx, nvgRGBA(table.unpack(bar.color)))
-        nvgFill(ctx)
-
-        -- 数值标签
-        nvgFontFace(ctx, "bold")
-        nvgFontSize(ctx, 11)
-        nvgTextAlign(ctx, NVG_ALIGN_CENTER + NVG_ALIGN_BOTTOM)
-        nvgFillColor(ctx, nvgRGBA(255, 255, 255, 230))
-        nvgText(ctx, bx + CONFIG.BAR_WIDTH / 2, by - 4,
-            tostring(math.floor(bar.value)), nil)
-
-        ::continue::
-    end
-
-    -- 绘制被拖拽的柱子（浮在最上层）
-    if DRAG.active and DRAG.barIndex >= 1 and DRAG.barIndex <= n then
-        local bar = bars[DRAG.barIndex]
-        local bh = bar.value
-        local bx = DRAG.currentX - CONFIG.BAR_WIDTH / 2
-        local by = bottomY - bh - 10  -- 拖拽时稍微浮起
-
-        -- 阴影
-        drawShadow(ctx, bx, by, CONFIG.BAR_WIDTH, bh, 4, 8)
-
-        -- 柱子
-        nvgBeginPath(ctx)
-        nvgRoundedRect(ctx, bx, by, CONFIG.BAR_WIDTH, bh, 4)
-        nvgFillColor(ctx, nvgRGBA(table.unpack(COLORS.barDrag)))
-        nvgFill(ctx)
-        nvgStrokeColor(ctx, nvgRGBA(255, 255, 255, 180))
-        nvgStrokeWidth(ctx, 2)
-        nvgStroke(ctx)
-
-        -- 数值标签
-        nvgFontFace(ctx, "bold")
-        nvgFontSize(ctx, 11)
-        nvgTextAlign(ctx, NVG_ALIGN_CENTER + NVG_ALIGN_BOTTOM)
-        nvgFillColor(ctx, nvgRGBA(255, 255, 255, 255))
-        nvgText(ctx, bx + CONFIG.BAR_WIDTH / 2, by - 4,
-            tostring(math.floor(bar.value)), nil)
-
-        -- 目标位置指示线
-        local targetIdx = getBarIndexAtX(DRAG.currentX)
-        if targetIdx >= 1 and targetIdx ~= DRAG.barIndex then
-            local tx = getBarX(targetIdx) - CONFIG.BAR_GAP / 2
-            if targetIdx > DRAG.barIndex then
-                tx = getBarX(targetIdx) + CONFIG.BAR_WIDTH + CONFIG.BAR_GAP / 2
-            end
+            -- 拖拽中的柱子: opacity 0.5 (HTML .bar.dragging)
             nvgBeginPath(ctx)
-            nvgMoveTo(ctx, tx, bottomY - CONFIG.BAR_MAX_HEIGHT - 10)
-            nvgLineTo(ctx, tx, bottomY + 4)
-            nvgStrokeColor(ctx, nvgRGBA(244, 67, 54, 200))
-            nvgStrokeWidth(ctx, 2)
-            nvgStroke(ctx)
+            nvgRoundedRectVarying(ctx, bx, by, CONFIG.BAR_WIDTH, bh, 2, 2, 0, 0)
+            nvgFillColor(ctx, nvgRGBA(74, 144, 226, 128))  -- 50% opacity
+            nvgFill(ctx)
+        else
+            -- 正常柱子
+            nvgBeginPath(ctx)
+            nvgRoundedRectVarying(ctx, bx, by, CONFIG.BAR_WIDTH, bh, 2, 2, 0, 0)
+            nvgFillColor(ctx, nvgRGBA(table.unpack(C.bar)))
+            nvgFill(ctx)
         end
     end
-
-    -- 底部基线
-    nvgBeginPath(ctx)
-    local startX = getBarAreaStartX() - 10
-    local endX = startX + CONFIG.BAR_COUNT * (CONFIG.BAR_WIDTH + CONFIG.BAR_GAP) + 10
-    nvgMoveTo(ctx, startX, bottomY + 1)
-    nvgLineTo(ctx, endX, bottomY + 1)
-    nvgStrokeColor(ctx, nvgRGBA(180, 180, 180, 255))
-    nvgStrokeWidth(ctx, 1)
-    nvgStroke(ctx)
 end
 
---- 绘制计时器
-local function drawTimer(ctx, cx, y)
-    local elapsed = 0
-    if STATE.phase == "sorting" then
-        elapsed = time:GetElapsedTime() - STATE.startTime
-    elseif STATE.phase == "result" or STATE.phase == "verified" then
-        elapsed = STATE.elapsed
-    end
+--- 绘制底栏 (对齐 HTML: border-top #eee, 左侧 🔄🎧ⓘ, 右侧蓝色 "验证" 按钮)
+local function drawFooter(ctx, cardX, cardW, footerY)
+    local footerH = CARD.FOOTER_H
 
-    local timeStr = string.format("%.2f s", elapsed)
-
-    nvgFontFace(ctx, "bold")
-    nvgFontSize(ctx, 28)
-    nvgTextAlign(ctx, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
-
-    if STATE.phase == "verified" then
-        nvgFillColor(ctx, nvgRGBA(table.unpack(COLORS.success)))
-    elseif elapsed <= CONFIG.ROBOT_TIME and STATE.phase == "sorting" then
-        nvgFillColor(ctx, nvgRGBA(table.unpack(COLORS.success)))
-    else
-        nvgFillColor(ctx, nvgRGBA(table.unpack(COLORS.textDark)))
-    end
-
-    nvgText(ctx, cx, y, timeStr, nil)
-
-    -- 副标题
-    nvgFontFace(ctx, "sans")
-    nvgFontSize(ctx, 11)
-    nvgFillColor(ctx, nvgRGBA(table.unpack(COLORS.textLight)))
-    if STATE.phase == "idle" then
-        nvgText(ctx, cx, y + 20, "拖动柱子开始排序", nil)
-    elseif STATE.phase == "sorting" then
-        nvgText(ctx, cx, y + 20, string.format("交换次数: %d", STATE.roundSwaps), nil)
-    end
-end
-
---- 绘制底部栏（模仿 reCAPTCHA 底部）
-local function drawFooter(ctx, cardX, cardW, y, footerH)
+    -- 白色底栏背景
     nvgBeginPath(ctx)
-    nvgRoundedRectVarying(ctx, cardX, y, cardW, footerH, 0, 0, 8, 8)
-    nvgFillColor(ctx, nvgRGBA(table.unpack(COLORS.footerBg)))
+    nvgRect(ctx, cardX, footerY, cardW, footerH)
+    nvgFillColor(ctx, nvgRGBA(255, 255, 255, 255))
     nvgFill(ctx)
 
-    -- 分割线
+    -- 顶部分割线 #eee
     nvgBeginPath(ctx)
-    nvgMoveTo(ctx, cardX, y)
-    nvgLineTo(ctx, cardX + cardW, y)
-    nvgStrokeColor(ctx, nvgRGBA(220, 220, 220, 255))
+    nvgMoveTo(ctx, cardX, footerY)
+    nvgLineTo(ctx, cardX + cardW, footerY)
+    nvgStrokeColor(ctx, nvgRGBA(table.unpack(C.footerBorder)))
     nvgStrokeWidth(ctx, 1)
     nvgStroke(ctx)
 
-    -- 图标区
-    local iconY = y + footerH / 2
-    local iconStartX = cardX + 20
+    local iconY = footerY + footerH / 2
+    local ix = cardX + 15
 
-    -- 刷新图标 (简化圆弧)
+    -- 图标: 🔄 🎧 ⓘ (HTML: font-size 20, color #777, gap 15)
     nvgFontFace(ctx, "sans")
     nvgFontSize(ctx, 20)
     nvgTextAlign(ctx, NVG_ALIGN_LEFT + NVG_ALIGN_MIDDLE)
-    nvgFillColor(ctx, nvgRGBA(100, 100, 100, 255))
-    nvgText(ctx, iconStartX, iconY, "↻", nil)
+    nvgFillColor(ctx, nvgRGBA(table.unpack(C.iconGray)))
 
-    -- 耳机图标
-    nvgText(ctx, iconStartX + 32, iconY, "🎧", nil)
+    -- 🔄 (刷新按钮 - 可点击)
+    nvgText(ctx, ix, iconY, "🔄", nil)
+    REFRESH_BTN.x = ix - 4
+    REFRESH_BTN.y = footerY
+    REFRESH_BTN.w = 28
+    REFRESH_BTN.h = footerH
 
-    -- 机器人图标
-    nvgText(ctx, iconStartX + 64, iconY, "🤖", nil)
+    nvgText(ctx, ix + 35, iconY, "🎧", nil)
+    nvgText(ctx, ix + 70, iconY, "ⓘ", nil)
 
-    -- 右侧: 轮次 / 最佳成绩
-    nvgFontFace(ctx, "sans")
-    nvgFontSize(ctx, 10)
-    nvgTextAlign(ctx, NVG_ALIGN_RIGHT + NVG_ALIGN_MIDDLE)
-    nvgFillColor(ctx, nvgRGBA(table.unpack(COLORS.textLight)))
-    local infoText = string.format("Round %d", STATE.round)
-    if STATE.bestTime < math.huge then
-        infoText = infoText .. string.format("  |  Best: %.2fs", STATE.bestTime)
+    -- 右侧: 蓝色 "验证" 按钮
+    -- HTML: padding 10px 20px, font-weight bold, border-radius 3px, uppercase
+    local btnText = "验证"
+    local btnPadX = 20
+    local btnPadY = 10
+    nvgFontFace(ctx, "bold")
+    nvgFontSize(ctx, 14)
+
+    -- 测量文字宽度
+    local bounds = {}
+    nvgTextBounds(ctx, 0, 0, btnText, nil, bounds)
+    local textW = bounds[3] - bounds[1]
+
+    local btnW = textW + btnPadX * 2
+    local btnH = 14 + btnPadY * 2
+    local btnX = cardX + cardW - 15 - btnW
+    local btnY = iconY - btnH / 2
+
+    -- 按钮背景
+    nvgBeginPath(ctx)
+    nvgRoundedRect(ctx, btnX, btnY, btnW, btnH, 3)
+    if HOVER_VERIFY then
+        nvgFillColor(ctx, nvgRGBA(60, 120, 200, 255))  -- 悬停稍深
+    else
+        nvgFillColor(ctx, nvgRGBA(table.unpack(C.btnBg)))
     end
-    nvgText(ctx, cardX + cardW - 16, iconY, infoText, nil)
+    nvgFill(ctx)
+
+    -- 按钮文字
+    nvgTextAlign(ctx, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
+    nvgFillColor(ctx, nvgRGBA(table.unpack(C.btnText)))
+    nvgText(ctx, btnX + btnW / 2, btnY + btnH / 2, btnText, nil)
+
+    -- 缓存按钮热区
+    VERIFY_BTN.x = btnX
+    VERIFY_BTN.y = btnY
+    VERIFY_BTN.w = btnW
+    VERIFY_BTN.h = btnH
 end
 
---- 绘制结果页面
-local function drawResultOverlay(ctx, cx, cy, cardW)
-    local isRobot = STATE.phase == "verified"
-
-    -- 半透明遮罩
+--- 绘制结算遮罩 (对齐 HTML: 黑色 80% 遮罩, 白字, 居中, h2 + p + button)
+local function drawOverlay(ctx)
+    -- 全屏黑色遮罩 rgba(0,0,0,0.8)
     nvgBeginPath(ctx)
     nvgRect(ctx, 0, 0, SCREEN.logW, SCREEN.logH)
-    nvgFillColor(ctx, nvgRGBA(0, 0, 0, 100))
+    nvgFillColor(ctx, nvgRGBA(table.unpack(C.overlayBg)))
     nvgFill(ctx)
 
-    -- 结果卡片
-    local rw = cardW - 40
-    local rh = 260
-    local rx = cx - rw / 2
-    local ry = cy - rh / 2
+    local cx = SCREEN.logW / 2
+    local cy = SCREEN.logH / 2
 
-    drawShadow(ctx, rx, ry, rw, rh, 12, 16)
-    nvgBeginPath(ctx)
-    nvgRoundedRect(ctx, rx, ry, rw, rh, 12)
-    nvgFillColor(ctx, nvgRGBA(255, 255, 255, 250))
-    nvgFill(ctx)
-
-    if isRobot then
-        -- 机器人验证成功
-        -- 绿色大圆勾
-        local checkCx = cx
-        local checkCy = ry + 55
-        nvgBeginPath(ctx)
-        nvgCircle(ctx, checkCx, checkCy, 30)
-        nvgFillColor(ctx, nvgRGBA(76, 175, 80, 255))
-        nvgFill(ctx)
-
+    if STATE.phase == "verified" then
+        -- 机器人验证通过 → 即将跳转
         nvgFontFace(ctx, "bold")
-        nvgFontSize(ctx, 32)
+        nvgFontSize(ctx, 28)
         nvgTextAlign(ctx, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
-        nvgFillColor(ctx, nvgRGBA(255, 255, 255, 255))
-        nvgText(ctx, checkCx, checkCy, "✓", nil)
-
-        nvgFontFace(ctx, "bold")
-        nvgFontSize(ctx, 20)
-        nvgTextAlign(ctx, NVG_ALIGN_CENTER + NVG_ALIGN_TOP)
-        nvgFillColor(ctx, nvgRGBA(76, 175, 80, 255))
-        nvgText(ctx, cx, ry + 95, "验证通过！", nil)
+        nvgFillColor(ctx, nvgRGBA(table.unpack(C.white)))
+        nvgText(ctx, cx, cy - 40, "✓ 验证通过", nil)
 
         nvgFontFace(ctx, "sans")
+        nvgFontSize(ctx, 16)
+        nvgText(ctx, cx, cy + 10, "确认您是机器人", nil)
+
         nvgFontSize(ctx, 14)
-        nvgFillColor(ctx, nvgRGBA(table.unpack(COLORS.textDark)))
-        nvgText(ctx, cx, ry + 125, "确认您是机器人", nil)
+        nvgFillColor(ctx, nvgRGBA(200, 200, 200, 255))
+        nvgText(ctx, cx, cy + 40,
+            string.format("用时 %.2fs · %d 次交换", STATE.elapsed, STATE.roundSwaps), nil)
 
-        nvgFontSize(ctx, 12)
-        nvgFillColor(ctx, nvgRGBA(table.unpack(COLORS.textLight)))
-        nvgText(ctx, cx, ry + 150,
-            string.format("用时 %.2f 秒 · %d 次交换", STATE.elapsed, STATE.roundSwaps), nil)
-
-        -- 倒计时
-        nvgFontSize(ctx, 13)
-        nvgFillColor(ctx, nvgRGBA(66, 133, 244, 255))
-        nvgText(ctx, cx, ry + 180,
+        nvgFontSize(ctx, 14)
+        nvgFillColor(ctx, nvgRGBA(100, 200, 255, 255))
+        nvgText(ctx, cx, cy + 75,
             string.format("%.1f 秒后跳转...", math.max(0, STATE.verifiedCountdown)), nil)
-
-        -- 跳转链接提示
-        nvgFontSize(ctx, 9)
-        nvgFillColor(ctx, nvgRGBA(table.unpack(COLORS.textLight)))
-        nvgText(ctx, cx, ry + 210, "即将前往 bilibili.com", nil)
     else
-        -- 人类结果
-        -- 红色 X
-        local xCx = cx
-        local xCy = ry + 55
-        nvgBeginPath(ctx)
-        nvgCircle(ctx, xCx, xCy, 30)
-        nvgFillColor(ctx, nvgRGBA(244, 67, 54, 255))
-        nvgFill(ctx)
-
+        -- "验证失败" 或 "排序错误" (对齐 HTML: h2 + p + button)
+        -- h2 标题
         nvgFontFace(ctx, "bold")
-        nvgFontSize(ctx, 32)
+        nvgFontSize(ctx, 28)
         nvgTextAlign(ctx, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
-        nvgFillColor(ctx, nvgRGBA(255, 255, 255, 255))
-        nvgText(ctx, xCx, xCy, "✗", nil)
+        nvgFillColor(ctx, nvgRGBA(table.unpack(C.white)))
+        nvgText(ctx, cx, cy - 50, STATE.resultMsg, nil)
 
-        nvgFontFace(ctx, "bold")
-        nvgFontSize(ctx, 20)
-        nvgTextAlign(ctx, NVG_ALIGN_CENTER + NVG_ALIGN_TOP)
-        nvgFillColor(ctx, nvgRGBA(244, 67, 54, 255))
-        nvgText(ctx, cx, ry + 95, "验证失败", nil)
-
+        -- p 描述 (可能很长，需要换行绘制)
         nvgFontFace(ctx, "sans")
         nvgFontSize(ctx, 14)
-        nvgFillColor(ctx, nvgRGBA(table.unpack(COLORS.textDark)))
-        nvgText(ctx, cx, ry + 125, "您似乎不是机器人", nil)
+        nvgFillColor(ctx, nvgRGBA(220, 220, 220, 255))
+        nvgTextAlign(ctx, NVG_ALIGN_CENTER + NVG_ALIGN_TOP)
+        -- 简单的手动分行（限宽 300px）
+        nvgTextBox(ctx, cx - 150, cy - 15, 300, STATE.resultDesc, nil)
 
-        nvgFontSize(ctx, 12)
-        nvgFillColor(ctx, nvgRGBA(table.unpack(COLORS.textLight)))
-        nvgText(ctx, cx, ry + 150,
-            string.format("用时 %.2f 秒 · %d 次交换", STATE.elapsed, STATE.roundSwaps), nil)
+        -- "再次尝试" 按钮 (HTML: padding 10px 20px)
+        local retryText = "再次尝试"
+        nvgFontFace(ctx, "bold")
+        nvgFontSize(ctx, 14)
+        local bounds = {}
+        nvgTextBounds(ctx, 0, 0, retryText, nil, bounds)
+        local tw = bounds[3] - bounds[1]
+        local rbtnW = tw + 40
+        local rbtnH = 34
+        local rbtnX = cx - rbtnW / 2
+        local rbtnY = cy + 55
 
-        nvgText(ctx, cx, ry + 170,
-            string.format("需要 ≤ %.1f 秒 才能通过", CONFIG.ROBOT_TIME), nil)
+        nvgBeginPath(ctx)
+        nvgRoundedRect(ctx, rbtnX, rbtnY, rbtnW, rbtnH, 3)
+        nvgFillColor(ctx, nvgRGBA(table.unpack(C.btnBg)))
+        nvgFill(ctx)
 
-        -- 继续按钮提示
-        nvgFontSize(ctx, 13)
-        nvgFillColor(ctx, nvgRGBA(66, 133, 244, 255))
-        nvgText(ctx, cx, ry + 210, "[ 点击任意处继续下一轮 ]", nil)
-
-        -- 历次成绩
-        if #STATE.history > 1 then
-            nvgFontSize(ctx, 10)
-            nvgFillColor(ctx, nvgRGBA(table.unpack(COLORS.textLight)))
-            local histStr = "历史: "
-            local startIdx = math.max(1, #STATE.history - 4)
-            for i = startIdx, #STATE.history do
-                histStr = histStr .. string.format("R%d=%.2fs ", STATE.history[i].round, STATE.history[i].time)
-            end
-            nvgText(ctx, cx, ry + rh - 16, histStr, nil)
-        end
+        nvgTextAlign(ctx, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
+        nvgFillColor(ctx, nvgRGBA(table.unpack(C.white)))
+        nvgText(ctx, cx, rbtnY + rbtnH / 2, retryText, nil)
     end
 end
 
---- 主渲染
+--- 主渲染函数
 function HandleNanoVGRender(eventType, eventData)
     if not nvgCtx_ then return end
-
     local ctx = nvgCtx_
 
-    -- 更新屏幕信息
+    -- 更新屏幕
     SCREEN.w = graphics:GetWidth()
     SCREEN.h = graphics:GetHeight()
     SCREEN.dpr = graphics:GetDPR()
@@ -586,57 +497,50 @@ function HandleNanoVGRender(eventType, eventData)
     local logW = SCREEN.logW
     local logH = SCREEN.logH
 
-    -- 背景
+    -- 页面背景 #e9e9e9
     nvgBeginPath(ctx)
     nvgRect(ctx, 0, 0, logW, logH)
-    nvgFillColor(ctx, nvgRGBA(table.unpack(COLORS.bg)))
+    nvgFillColor(ctx, nvgRGBA(table.unpack(C.pageBg)))
     nvgFill(ctx)
 
-    -- 卡片尺寸
-    local cardW = math.min(360, logW - 32)
-    local cardH = 480
-    local cardX = (logW - cardW) / 2
-    local cardY = math.max(20, (logH - cardH) / 2 - 20)
-    local cx = logW / 2
+    -- 卡片
+    local cardX, cardY, cardTotalH = getCardOrigin()
 
     -- 卡片阴影
-    drawShadow(ctx, cardX, cardY, cardW, cardH, 8, 12)
+    drawCardShadow(ctx, cardX, cardY, CARD.W, cardTotalH)
 
-    -- 卡片背景
+    -- 卡片白色背景 + 1px #ccc 边框 (无圆角)
     nvgBeginPath(ctx)
-    nvgRoundedRect(ctx, cardX, cardY, cardW, cardH, 8)
-    nvgFillColor(ctx, nvgRGBA(table.unpack(COLORS.cardBg)))
+    nvgRect(ctx, cardX, cardY, CARD.W, cardTotalH)
+    nvgFillColor(ctx, nvgRGBA(table.unpack(C.cardBg)))
     nvgFill(ctx)
-    nvgStrokeColor(ctx, nvgRGBA(table.unpack(COLORS.cardBorder)))
+    nvgStrokeColor(ctx, nvgRGBA(table.unpack(C.cardBorder)))
     nvgStrokeWidth(ctx, 1)
     nvgStroke(ctx)
 
     -- 头部
-    local contentY = drawHeader(ctx, cx, cardX, cardW, cardY)
+    local headerH = drawHeader(ctx, cardX, cardY, CARD.W)
 
-    -- 计时器
-    drawTimer(ctx, cx, contentY + 30)
+    -- 内容区 (白色, padding 10, height 200)
+    local contentY = cardY + headerH + CARD.CONTENT_PAD
 
-    -- 柱状图区域
-    local barsBottomY = cardY + cardH - 70
-    CONFIG.AREA_BOTTOM_Y = barsBottomY
-    drawBars(ctx, barsBottomY)
+    -- 计算柱状图布局并缓存
+    local startX, gap, bottomY = getBarLayout(cardX, contentY - CARD.CONTENT_PAD)
+    BARS_LAYOUT.startX = startX
+    BARS_LAYOUT.gap = gap
+    BARS_LAYOUT.bottomY = bottomY
+    BARS_LAYOUT.contentY = contentY - CARD.CONTENT_PAD
 
-    -- 底部栏
-    drawFooter(ctx, cardX, cardW, cardY + cardH - 50, 50)
+    -- 绘制柱子
+    drawBars(ctx)
 
-    -- 结果 / 验证成功遮罩
-    if STATE.phase == "result" or STATE.phase == "verified" then
-        drawResultOverlay(ctx, cx, logH / 2, cardW)
-    end
+    -- 底栏
+    local footerY = cardY + headerH + CARD.CONTENT_PAD * 2 + CONFIG.CONTENT_H
+    drawFooter(ctx, cardX, CARD.W, footerY)
 
-    -- idle 提示覆盖
-    if STATE.phase == "idle" then
-        nvgFontFace(ctx, "sans")
-        nvgFontSize(ctx, 12)
-        nvgTextAlign(ctx, NVG_ALIGN_CENTER + NVG_ALIGN_TOP)
-        nvgFillColor(ctx, nvgRGBA(66, 133, 244, 200))
-        nvgText(ctx, cx, barsBottomY + 8, "↕ 拖动任意柱子开始计时", nil)
+    -- 结算遮罩
+    if STATE.phase == "result" or STATE.phase == "wrong" or STATE.phase == "verified" then
+        drawOverlay(ctx)
     end
 
     nvgEndFrame(ctx)
@@ -652,9 +556,12 @@ end
 
 --- 判断点击是否在某个柱子上
 local function hitTestBar(lx, ly)
-    local bottomY = CONFIG.AREA_BOTTOM_Y
+    local startX = BARS_LAYOUT.startX
+    local gap = BARS_LAYOUT.gap
+    local bottomY = BARS_LAYOUT.bottomY
+
     for i = 1, #STATE.bars do
-        local bx = getBarX(i)
+        local bx = getBarX(startX, gap, i)
         local bh = STATE.bars[i].value
         local by = bottomY - bh
         if lx >= bx and lx <= bx + CONFIG.BAR_WIDTH and ly >= by and ly <= bottomY then
@@ -672,46 +579,54 @@ function HandleMouseButtonDown(eventType, eventData)
     local sy = eventData["Y"]:GetInt()
     local lx, ly = screenToLogical(sx, sy)
 
-    -- 在结果页点击: 进入下一轮
-    if STATE.phase == "result" then
+    -- 结算页: 点击任意处 → 下一轮
+    if STATE.phase == "result" or STATE.phase == "wrong" then
         nextRound()
         return
     end
-
-    -- 验证成功页不处理点击
     if STATE.phase == "verified" then return end
+
+    -- 点击 "验证" 按钮
+    if pointInRect(lx, ly, VERIFY_BTN.x, VERIFY_BTN.y, VERIFY_BTN.w, VERIFY_BTN.h) then
+        doVerify()
+        return
+    end
+
+    -- 点击 🔄 刷新按钮
+    if pointInRect(lx, ly, REFRESH_BTN.x, REFRESH_BTN.y, REFRESH_BTN.w, REFRESH_BTN.h) then
+        startNewRound()
+        return
+    end
 
     -- 点击柱子开始拖拽
     local idx = hitTestBar(lx, ly)
     if idx >= 1 then
-        -- 第一次拖拽开始计时
         if STATE.phase == "idle" then
             beginSorting()
         end
-
         DRAG.active = true
         DRAG.barIndex = idx
-        DRAG.startX = getBarX(idx) + CONFIG.BAR_WIDTH / 2
         DRAG.currentX = lx
         DRAG.currentY = ly
-        DRAG.offsetX = lx - (getBarX(idx) + CONFIG.BAR_WIDTH / 2)
     end
 end
 
 function HandleMouseMove(eventType, eventData)
-    if not DRAG.active then return end
-
     local sx = eventData["X"]:GetInt()
     local sy = eventData["Y"]:GetInt()
     local lx, ly = screenToLogical(sx, sy)
 
+    -- 更新悬停状态
+    HOVER_VERIFY = pointInRect(lx, ly, VERIFY_BTN.x, VERIFY_BTN.y, VERIFY_BTN.w, VERIFY_BTN.h)
+
+    if not DRAG.active then return end
+
     DRAG.currentX = lx
     DRAG.currentY = ly
 
-    -- 实时交换：当拖到另一个柱子的位置时交换
-    local targetIdx = getBarIndexAtX(lx)
+    -- 实时交换
+    local targetIdx = getBarIndexAtPos(lx, BARS_LAYOUT.startX, BARS_LAYOUT.gap)
     if targetIdx >= 1 and targetIdx ~= DRAG.barIndex then
-        -- 交换数据
         STATE.bars[DRAG.barIndex], STATE.bars[targetIdx] = STATE.bars[targetIdx], STATE.bars[DRAG.barIndex]
         DRAG.barIndex = targetIdx
         STATE.roundSwaps = STATE.roundSwaps + 1
@@ -725,25 +640,30 @@ function HandleMouseButtonUp(eventType, eventData)
     if DRAG.active then
         DRAG.active = false
         DRAG.barIndex = -1
-
-        -- 检查是否排序完成
-        if STATE.phase == "sorting" then
-            checkComplete()
-        end
     end
 end
 
--- 触摸事件处理（移动端适配）
+-- 触摸事件
 function HandleTouchBegin(eventType, eventData)
     local sx = eventData["X"]:GetInt()
     local sy = eventData["Y"]:GetInt()
     local lx, ly = screenToLogical(sx, sy)
 
-    if STATE.phase == "result" then
+    if STATE.phase == "result" or STATE.phase == "wrong" then
         nextRound()
         return
     end
     if STATE.phase == "verified" then return end
+
+    if pointInRect(lx, ly, VERIFY_BTN.x, VERIFY_BTN.y, VERIFY_BTN.w, VERIFY_BTN.h) then
+        doVerify()
+        return
+    end
+
+    if pointInRect(lx, ly, REFRESH_BTN.x, REFRESH_BTN.y, REFRESH_BTN.w, REFRESH_BTN.h) then
+        startNewRound()
+        return
+    end
 
     local idx = hitTestBar(lx, ly)
     if idx >= 1 then
@@ -752,10 +672,8 @@ function HandleTouchBegin(eventType, eventData)
         end
         DRAG.active = true
         DRAG.barIndex = idx
-        DRAG.startX = getBarX(idx) + CONFIG.BAR_WIDTH / 2
         DRAG.currentX = lx
         DRAG.currentY = ly
-        DRAG.offsetX = lx - (getBarX(idx) + CONFIG.BAR_WIDTH / 2)
     end
 end
 
@@ -767,7 +685,7 @@ function HandleTouchMove(eventType, eventData)
     DRAG.currentX = lx
     DRAG.currentY = ly
 
-    local targetIdx = getBarIndexAtX(lx)
+    local targetIdx = getBarIndexAtPos(lx, BARS_LAYOUT.startX, BARS_LAYOUT.gap)
     if targetIdx >= 1 and targetIdx ~= DRAG.barIndex then
         STATE.bars[DRAG.barIndex], STATE.bars[targetIdx] = STATE.bars[targetIdx], STATE.bars[DRAG.barIndex]
         DRAG.barIndex = targetIdx
@@ -779,14 +697,11 @@ function HandleTouchEnd(eventType, eventData)
     if DRAG.active then
         DRAG.active = false
         DRAG.barIndex = -1
-        if STATE.phase == "sorting" then
-            checkComplete()
-        end
     end
 end
 
 -- ============================================================================
--- 更新循环
+-- 更新
 -- ============================================================================
 
 ---@param eventType string
@@ -794,14 +709,12 @@ end
 function HandleUpdate(eventType, eventData)
     local dt = eventData["TimeStep"]:GetFloat()
 
-    -- 验证成功倒计时跳转
     if STATE.phase == "verified" then
         STATE.verifiedCountdown = STATE.verifiedCountdown - dt
         if STATE.verifiedCountdown <= 0 then
-            -- 执行跳转
             print("=== Redirecting to: " .. CONFIG.REDIRECT_URL .. " ===")
-            OpenURL(CONFIG.REDIRECT_URL)
-            STATE.phase = "idle"  -- 防止重复跳转
+            -- 引擎无浏览器跳转 API，打印链接供外部处理
+            STATE.phase = "redirected"
         end
     end
 end
@@ -811,11 +724,9 @@ end
 -- ============================================================================
 
 function Start()
-    graphics.windowTitle = "roBOTCHA - 机器人验证"
-
+    graphics.windowTitle = "机器人身份验证"
     math.randomseed(os.time())
 
-    -- 初始化 UI 系统
     UI.Init({
         fonts = {
             { family = "sans", weights = { normal = "Fonts/MiSans-Regular.ttf" } }
@@ -823,16 +734,18 @@ function Start()
         scale = UI.Scale.DEFAULT,
     })
 
-    -- 初始化 NanoVG (独立上下文用于自定义渲染)
     initNanoVG()
 
-    -- 创建 UI
-    CreateUI()
+    uiRoot_ = UI.Panel {
+        id = "root",
+        width = "100%",
+        height = "100%",
+        pointerEvents = "box-none",
+    }
+    UI.SetRoot(uiRoot_)
 
-    -- 初始化游戏
     startNewRound()
 
-    -- 订阅事件
     SubscribeToEvent("Update", "HandleUpdate")
     SubscribeToEvent("MouseButtonDown", "HandleMouseButtonDown")
     SubscribeToEvent("MouseMove", "HandleMouseMove")
@@ -841,9 +754,7 @@ function Start()
     SubscribeToEvent("TouchMove", "HandleTouchMove")
     SubscribeToEvent("TouchEnd", "HandleTouchEnd")
 
-    print("=== roBOTCHA Started ===")
-    print("Sort the bars from short to tall.")
-    print("Complete in under 1 second to prove you're a robot!")
+    print("=== 机器人身份验证 ===")
 end
 
 function Stop()
