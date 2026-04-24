@@ -1,0 +1,47 @@
+[
+    {
+        "ref": "imgs/1_T.png",
+        "verify": "imgs/1_B.png",
+        "target": {
+            "x": 0.485,
+            "y": 0.405,
+            "radius": 50
+        }
+    },
+    {
+        "ref": "imgs/2_T.png",
+        "verify": "imgs/2_B.png",
+        "target": {
+            "x": 0.263,
+            "y": 0.481,
+            "radius": 50
+        }
+    },
+    {
+        "ref": "imgs/3_T.png",
+        "verify": "imgs/3_B.png",
+        "target": {
+            "x": 0.343,
+            "y": 0.392,
+            "radius": 50
+        }
+    },
+    {
+        "ref": "imgs/4_T.png",
+        "verify": "imgs/4_B.png",
+        "target": {
+            "x": 0.636,
+            "y": 0.568,
+            "radius": 50
+        }
+    },
+    {
+        "ref": "imgs/5_T.png",
+        "verify": "imgs/5_B.png",
+        "target": {
+            "x": 0.242,
+            "y": 0.091,
+            "radius": 41
+        }
+    }
+]

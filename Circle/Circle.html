@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>红圈验证</title>
+    <style>
+        :root {
+            --blue-primary: #4A90E2;
+            --bg-gray: #f9f9f9;
+            --error-red: #f44336;
+            --success-green: #4caf50;
+        }
+
+        body {
+            font-family: "Microsoft YaHei", sans-serif;
+            background-color: #e9e9e9;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        /* 验证码外框 */
+        .captcha-container {
+            width: 400px;
+            background: white;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            border: 1px solid #ccc;
+            position: relative;
+            z-index: 10;
+        }
+
+        /* 蓝色头部：左侧文字，右侧参考图 */
+        .header {
+            background-color: var(--blue-primary);
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 80px;
+        }
+
+        .header-text { flex: 1; }
+        .header .title-small { font-size: 12px; opacity: 0.9; }
+        .header .title-large { font-size: 20px; font-weight: bold; margin: 4px 0; }
+
+        .reference-box {
+            width: 70px;
+            height: 70px;
+            background: white;
+            border-radius: 4px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .reference-box img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        /* 内容区：验证图片展示 */
+        .content {
+            padding: 0;
+            height: 300px;
+            background: #fff;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: crosshair;
+            transition: opacity 0.5s ease;
+        }
+
+        .verify-img-wrapper {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #fff;
+        }
+
+        #verify-img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            pointer-events: none;
+        }
+
+        /* 红圈样式 */
+        .red-circle {
+            position: absolute;
+            border: 4px solid red;
+            border-radius: 50%;
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            display: none;
+            z-index: 5;
+        }
+
+        /* 底部工具栏 */
+        .footer {
+            border-top: 1px solid #eee;
+            padding: 10px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .hint-text { font-size: 13px; color: #666; transition: color 0.3s; }
+
+        .verify-btn {
+            background-color: var(--blue-primary);
+            color: white;
+            border: none;
+            padding: 8px 18px;
+            font-weight: bold;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+        /* 覆盖层及箭头 */
+        #svg-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 8;
+        }
+
+        /* 全屏重置提示 */
+        #reset-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9);
+            color: white;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+
+        .fade-out { opacity: 0; }
+        .fade-in { opacity: 1; }
+    </style>
+</head>
+<body>
+
+<div class="captcha-container" id="main-container">
+    <div class="header">
+        <div class="header-text">
+            <div class="title-small">找到匹配右侧图片的位置</div>
+            <div class="title-large">证明你是人类 (HUMAN)</div>
+            <div class="title-small">错误尝试: <span id="error-count">0</span>/3</div>
+        </div>
+        <div class="reference-box">
+            <img id="ref-img" src="" alt="参考图">
+        </div>
+    </div>
+
+    <div class="content" id="click-area">
+        <div class="verify-img-wrapper" id="img-wrapper">
+            <img id="verify-img" src="" alt="验证图">
+        </div>
+        <div id="red-circle" class="red-circle"></div>
+    </div>
+
+    <div class="footer">
+        <div class="hint-text" id="status-msg">点击图片中对应位置</div>
+        <button class="verify-btn" onclick="checkVerify()">验证</button>
+    </div>
+
+    <svg id="svg-overlay">
+        <defs>
+            <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto">
+                <polygon points="0 0, 10 3.5, 0 7" fill="red" />
+            </marker>
+        </defs>
+        <line id="success-arrow" x1="0" y1="0" x2="0" y2="0" stroke="red" stroke-width="4" marker-end="url(#arrowhead)" style="display:none" />
+    </svg>
+</div>
+
+<div id="reset-overlay">
+    <h2>验证多次失败</h2>
+    <button onclick="resetGame(true)" style="padding: 10px 20px; cursor:pointer; margin-top:20px;">重新开始</button>
+</div>
+
+<script>
+    let config = [];
+    let currentIndex = 0;
+    let errorCount = 0;
+    let selectedPos = null;
+
+    async function init() {
+        try {
+            const response = await fetch('imgs_config.json');
+            if (!response.ok) throw new Error('无法读取 imgs_config.json，请检查文件是否存在');
+            config = await response.json();
+            if (config.length > 0) {
+                loadStep(0);
+            } else {
+                statusMsg.innerText = "配置文件为空";
+            }
+        } catch (err) {
+            console.error(err);
+            statusMsg.innerText = "配置加载失败，请检查控制台";
+            statusMsg.style.color = "red";
+        }
+    }
+
+    // 页面加载完成后启动
+    window.onload = init;
+
+    const clickArea = document.getElementById('click-area');
+    const redCircle = document.getElementById('red-circle');
+    const statusMsg = document.getElementById('status-msg');
+    const arrow = document.getElementById('success-arrow');
+
+    // 初始化加载
+    function loadStep(index) {
+        if (index >= config.length) {
+            alert("验证成功！");
+            window.location.href = "https://www.bilibili.com/video/BV1dyXqBaEE5/";
+            return;
+        }
+
+        const data = config[index];
+        const content = document.getElementById('click-area');
+        
+        // 淡出效果
+        content.classList.add('fade-out');
+        
+        setTimeout(() => {
+            document.getElementById('ref-img').src = data.ref;
+            document.getElementById('verify-img').src = data.verify;
+            
+            // 重置状态
+            redCircle.style.display = 'none';
+            arrow.style.display = 'none';
+            selectedPos = null;
+            statusMsg.innerText = "点击图片中对应位置";
+            statusMsg.style.color = "#666";
+            
+            // 淡入效果
+            content.classList.remove('fade-out');
+        }, 500);
+    }
+
+    // 点击记录位置
+    clickArea.addEventListener('click', (e) => {
+        const rect = clickArea.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        // 记录相对百分比坐标
+        selectedPos = { 
+            px: x / rect.width, 
+            py: y / rect.height,
+            rawX: x,
+            rawY: y
+        };
+
+        // 显示红圈
+        redCircle.style.left = x + 'px';
+        redCircle.style.top = y + 'px';
+        redCircle.style.width = '60px';
+        redCircle.style.height = '40px';
+        redCircle.style.display = 'block';
+    });
+
+    // 验证逻辑
+    function checkVerify() {
+        if (!selectedPos) {
+            updateStatus("请先在图中圈出位置", "error");
+            return;
+        }
+
+        const target = config[currentIndex].target;
+        const dist = Math.sqrt(Math.pow(selectedPos.px - target.x, 2) + Math.pow(selectedPos.py - target.y, 2));
+
+        // 判断是否在目标范围内（阈值设为 0.1 相对单位，可根据难易度调整）
+        if (dist < 0.12) {
+            handleSuccess();
+        } else {
+            handleFailure();
+        }
+    }
+
+    function handleSuccess() {
+        updateStatus("验证成功！", "success");
+
+        // 获取 click-area 相对于父容器 .captcha-container 的偏移
+        // 这样 y1 就能对齐到 SVG 的坐标系中
+        const headerHeight = clickArea.offsetTop;
+
+        // 设置箭头的起始点（x1, y1）
+        // y1 需要加上 header 的高度，因为 SVG 覆盖了整个容器
+        arrow.setAttribute('x1', selectedPos.rawX);
+        arrow.setAttribute('y1', selectedPos.rawY + headerHeight);
+
+        // 设置箭头的终点（x2, y2）
+        // 355 和 40 对应右上角参考图区域的中心点
+        arrow.setAttribute('x2', 300);
+        arrow.setAttribute('y2', 100);
+
+        arrow.style.display = 'block';
+
+        currentIndex++;
+        setTimeout(() => loadStep(currentIndex), 1200);
+    }
+
+    function handleFailure() {
+        errorCount++;
+        document.getElementById('error-count').innerText = errorCount;
+        
+        if (errorCount >= 3) {
+            document.getElementById('reset-overlay').style.display = 'flex';
+        } else {
+            updateStatus("验证失败，请重试", "error");
+            redCircle.style.display = 'none';
+            selectedPos = null;
+        }
+    }
+
+    function updateStatus(text, type) {
+        statusMsg.innerText = text;
+        statusMsg.style.color = type === "success" ? "var(--success-green)" : "var(--error-red)";
+    }
+
+    function resetGame(fullReset) {
+        errorCount = 0;
+        document.getElementById('error-count').innerText = "0";
+        document.getElementById('reset-overlay').style.display = 'none';
+        if(fullReset) currentIndex = 0;
+        loadStep(currentIndex);
+    }
+
+</script>
+
+</body>
+</html>
