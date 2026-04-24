@@ -1,0 +1,13 @@
+{
+    "pack": "default",
+    "author": "CS-LX",
+    "authorUrl": "https://github.com/CS-LX",
+    "description": "初代默认关卡",
+    "items": [
+        { "ref": "imgs/default/1_T.png", "verify": "imgs/default/1_B.png", "target": { "x": 0.485, "y": 0.405, "radius": 50 } },
+        { "ref": "imgs/default/2_T.png", "verify": "imgs/default/2_B.png", "target": { "x": 0.263, "y": 0.481, "radius": 50 } },
+        { "ref": "imgs/default/3_T.png", "verify": "imgs/default/3_B.png", "target": { "x": 0.343, "y": 0.392, "radius": 50 } },
+        { "ref": "imgs/default/4_T.png", "verify": "imgs/default/4_B.png", "target": { "x": 0.636, "y": 0.568, "radius": 50 } },
+        { "ref": "imgs/default/5_T.png", "verify": "imgs/default/5_B.png", "target": { "x": 0.242, "y": 0.091, "radius": 41 } }
+    ]
+}

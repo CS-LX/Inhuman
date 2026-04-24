@@ -114,7 +114,26 @@
             align-items: center;
         }
 
-        .hint-text { font-size: 13px; color: #666; transition: color 0.3s; }
+        .hint-text { font-size: 13px; color: #666; transition: color 0.3s; flex: 1; text-align: center; }
+
+        .editor-link {
+            font-size: 11px;
+            color: #999;
+            text-decoration: none;
+            white-space: nowrap;
+            transition: color 0.2s;
+        }
+        .editor-link:hover {
+            color: #666;
+            text-decoration: underline;
+        }
+
+        #pack-credit a {
+            color: inherit;
+            text-decoration: none;
+            opacity: 0.75;
+        }
+        #pack-credit a:hover { text-decoration: underline; }
 
         .verify-btn {
             background-color: var(--blue-primary);
@@ -159,6 +178,7 @@
             <div class="title-small">找到匹配右侧图片的位置</div>
             <div class="title-large">证明你是人类 (HUMAN)</div>
             <div class="title-small">错误尝试: <span id="error-count">0</span>/3</div>
+            <div class="title-small" id="pack-credit"></div>
         </div>
         <div class="reference-box">
             <img id="ref-img" src="" alt="参考图">
@@ -173,6 +193,7 @@
     </div>
 
     <div class="footer">
+        <a class="editor-link" href="Editor.html" target="_blank" rel="noopener">我也想做 →</a>
         <div class="hint-text" id="status-msg">点击图片中对应位置</div>
         <button class="verify-btn" onclick="checkVerify()">验证</button>
     </div>
@@ -198,16 +219,90 @@
     let errorCount = 0;
     let selectedPos = null;
 
+    const clickArea = document.getElementById('click-area');
+    const redCircle = document.getElementById('red-circle');
+    const statusMsg = document.getElementById('status-msg');
+    const arrow = document.getElementById('success-arrow');
+    const packCredit = document.getElementById('pack-credit');
+
+    // Fisher–Yates 洗牌
+    function shuffle(arr) {
+        for (let i = arr.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+        return arr;
+    }
+
+    // 把一个 pack 的原始 JSON 规范化成 { pack, author, authorUrl, items }
+    function normalizePack(raw, filename) {
+        const fallbackName = filename.replace(/\.json$/i, '');
+        if (Array.isArray(raw)) {
+            return {
+                pack: fallbackName,
+                author: 'unknown',
+                authorUrl: null,
+                description: '',
+                items: raw
+            };
+        }
+        if (raw && typeof raw === 'object' && Array.isArray(raw.items)) {
+            return {
+                pack: raw.pack || fallbackName,
+                author: raw.author || 'unknown',
+                authorUrl: raw.authorUrl || null,
+                description: raw.description || '',
+                items: raw.items
+            };
+        }
+        return null;
+    }
+
     async function init() {
         try {
-            const response = await fetch('imgs_config.json');
-            if (!response.ok) throw new Error('无法读取 imgs_config.json，请检查文件是否存在');
-            config = await response.json();
-            if (config.length > 0) {
-                loadStep(0);
-            } else {
-                statusMsg.innerText = "配置文件为空";
+            const manifestRes = await fetch('configs/manifest.json');
+            if (!manifestRes.ok) throw new Error('无法读取 configs/manifest.json');
+            const manifest = await manifestRes.json();
+            const packFiles = Array.isArray(manifest.packs) ? manifest.packs : [];
+            if (packFiles.length === 0) throw new Error('manifest.packs 为空');
+
+            const results = await Promise.allSettled(
+                packFiles.map(name =>
+                    fetch('configs/' + name).then(r => {
+                        if (!r.ok) throw new Error('HTTP ' + r.status);
+                        return r.json().then(data => ({ name, data }));
+                    })
+                )
+            );
+
+            const pool = [];
+            results.forEach((res, i) => {
+                const name = packFiles[i];
+                if (res.status !== 'fulfilled') {
+                    console.warn('[Circle] 跳过 pack', name, ':', res.reason);
+                    return;
+                }
+                const pack = normalizePack(res.value.data, name);
+                if (!pack) {
+                    console.warn('[Circle] 跳过 pack', name, ': 格式无效（既不是数组也不是含 items 的对象）');
+                    return;
+                }
+                pack.items.forEach(item => {
+                    pool.push(Object.assign({}, item, {
+                        __author: pack.author,
+                        __authorUrl: pack.authorUrl,
+                        __pack: pack.pack
+                    }));
+                });
+            });
+
+            if (pool.length === 0) {
+                throw new Error('所有 pack 均加载失败或为空');
             }
+
+            shuffle(pool);
+            config = pool.slice(0, Math.min(5, pool.length));
+            loadStep(0);
         } catch (err) {
             console.error(err);
             statusMsg.innerText = "配置加载失败，请检查控制台";
@@ -218,10 +313,29 @@
     // 页面加载完成后启动
     window.onload = init;
 
-    const clickArea = document.getElementById('click-area');
-    const redCircle = document.getElementById('red-circle');
-    const statusMsg = document.getElementById('status-msg');
-    const arrow = document.getElementById('success-arrow');
+    function updatePackCredit(item) {
+        if (!item) {
+            packCredit.textContent = '';
+            return;
+        }
+        const author = item.__author && item.__author !== 'unknown' ? item.__author : null;
+        const displayName = author || '匿名';
+        const prefix = document.createTextNode('本关由 ');
+        const suffix = document.createTextNode(' 提供');
+        packCredit.textContent = '';
+        packCredit.appendChild(prefix);
+        if (author && item.__authorUrl) {
+            const a = document.createElement('a');
+            a.href = item.__authorUrl;
+            a.target = '_blank';
+            a.rel = 'noopener';
+            a.textContent = '@' + displayName;
+            packCredit.appendChild(a);
+        } else {
+            packCredit.appendChild(document.createTextNode(author ? '@' + displayName : displayName));
+        }
+        packCredit.appendChild(suffix);
+    }
 
     // 初始化加载
     function loadStep(index) {
@@ -240,6 +354,7 @@
         setTimeout(() => {
             document.getElementById('ref-img').src = data.ref;
             document.getElementById('verify-img').src = data.verify;
+            updatePackCredit(data);
             
             // 重置状态
             redCircle.style.display = 'none';
