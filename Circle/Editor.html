@@ -53,19 +53,46 @@
         .btn-export { background: #333; color: white; width: 100%; margin-top: 10px; }
 
         .error-msg { color: #ff4d4f; font-size: 12px; margin-top: 5px; display: none; }
+
+        /* Pack 元信息表单 */
+        .meta-group { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+        .meta-group label { font-size: 12px; font-weight: bold; color: #666; }
+        .meta-group input { padding: 6px; border: 1px solid var(--border); border-radius: 4px; font-size: 13px; }
+        .meta-group input.invalid { border: 1px solid #ff4d4f; }
+        .meta-hint { font-size: 12px; color: #999; margin-bottom: 12px; line-height: 1.5; }
+
+        /* 投稿指南链接 */
+        .contrib-link { font-size: 13px; color: var(--primary); text-decoration: none; display: block; text-align: center; margin-bottom: 10px; }
+        .contrib-link:hover { text-decoration: underline; }
     </style>
 </head>
 <body>
 
 <div id="sidebar">
     <h3 style="margin-top:0">配置管理</h3>
+
+    <div class="meta-group">
+        <label>作者名 <span style="color:#ff4d4f">*</span></label>
+        <input type="text" id="meta-author" placeholder="你的 GitHub 用户名，如 CS-LX">
+    </div>
+    <div class="meta-group">
+        <label>作者链接（可选）</label>
+        <input type="text" id="meta-author-url" placeholder="https://github.com/yourname（可选）">
+    </div>
+    <div class="meta-group">
+        <label>Pack 名 <span style="color:#ff4d4f">*</span></label>
+        <input type="text" id="meta-pack" placeholder="给这个关卡包起个名字，如 my-cats">
+    </div>
+    <div class="meta-hint">这些信息会写进导出的 JSON，作为你的署名。</div>
+
     <button class="btn btn-import" onclick="document.getElementById('import-json').click()">导入 JSON 配置文件</button>
     <input type="file" id="import-json" accept=".json" style="display:none" onchange="importJSON(this)">
 
     <div class="list-container" id="config-list">
     </div>
 
-    <button class="btn btn-export" onclick="exportJSON()">导出 imgs_config.json</button>
+    <a href="./CONTRIBUTING.md" target="_blank" class="contrib-link">📖 投稿指南：怎么把我的关卡合并到主仓库？</a>
+    <button class="btn btn-export" onclick="exportJSON()">导出 pack JSON</button>
 </div>
 
 <div id="workspace">
@@ -214,7 +241,6 @@
         };
         // 注意：由于无法从路径反推本地文件，重新编辑时建议先重新上传对应图片以获得预览
         elements.previewContainer.style.display = 'none';
-        alert("已加载配置参数，若需预览调整，请重新上传验证图文件以匹配路径。");
         renderList();
     }
 
@@ -231,30 +257,98 @@
         document.getElementById('file-verify').value = "";
     }
 
+    // --- 元信息输入框 ---
+    const metaInputs = {
+        author: document.getElementById('meta-author'),
+        authorUrl: document.getElementById('meta-author-url'),
+        pack: document.getElementById('meta-pack')
+    };
+
+    // 任何输入变化都清掉红框错误态
+    Object.values(metaInputs).forEach(el => {
+        el.addEventListener('input', () => el.classList.remove('invalid'));
+    });
+
     // --- JSON 导入导出 ---
     function importJSON(input) {
         const file = input.files[0];
         if (!file) return;
         const reader = new FileReader();
         reader.onload = (e) => {
+            let data;
             try {
-                configArr = JSON.parse(e.target.result);
-                renderList();
+                data = JSON.parse(e.target.result);
             } catch (err) {
-                alert("JSON 格式错误");
+                alert("JSON 解析失败：文件不是合法的 JSON。");
+                input.value = "";
+                return;
             }
+
+            let items, meta = null;
+            if (Array.isArray(data)) {
+                // 旧版纯数组格式
+                items = data;
+            } else if (data && typeof data === 'object' && Array.isArray(data.items)) {
+                // 新版 pack 对象格式
+                items = data.items;
+                meta = data;
+            } else {
+                alert("JSON 格式错误：顶层必须是数组或包含 items 数组的对象");
+                input.value = "";
+                return;
+            }
+
+            configArr = items;
+            // 回填元信息（旧版 meta 为 null，则清空输入框；新版按字段写入）
+            metaInputs.author.value = meta && typeof meta.author === 'string' ? meta.author : '';
+            metaInputs.authorUrl.value = meta && typeof meta.authorUrl === 'string' ? meta.authorUrl : '';
+            metaInputs.pack.value = meta && typeof meta.pack === 'string' ? meta.pack : '';
+            // 清掉所有红框
+            Object.values(metaInputs).forEach(el => el.classList.remove('invalid'));
+
+            editingIndex = -1;
+            resetEditor();
+            renderList();
+            input.value = "";
         };
         reader.readAsText(file);
     }
 
     function exportJSON() {
-        if (configArr.length === 0) return alert("没有可导出的数据");
-        const blob = new Blob([JSON.stringify(configArr, null, 4)], { type: 'application/json' });
+        const author = metaInputs.author.value.trim();
+        const authorUrl = metaInputs.authorUrl.value.trim();
+        const pack = metaInputs.pack.value.trim();
+
+        // 校验前先清掉旧的红框
+        Object.values(metaInputs).forEach(el => el.classList.remove('invalid'));
+
+        const missing = [];
+        if (!author) { metaInputs.author.classList.add('invalid'); missing.push('作者名'); }
+        if (!pack)   { metaInputs.pack.classList.add('invalid');   missing.push('Pack 名'); }
+        if (missing.length) {
+            return alert("导出失败：以下必填项为空 —— " + missing.join('、'));
+        }
+        if (configArr.length === 0) {
+            return alert("导出失败：当前列表为空，请至少添加 1 项。\n（提示：合并到主仓库要求至少 3 项，详见投稿指南。）");
+        }
+
+        // pack 不能含有非法文件名字符或空格
+        if (/[\/\\:*?"<>|\s]/.test(pack)) {
+            metaInputs.pack.classList.add('invalid');
+            return alert('导出失败：Pack 名不能包含空格或这些字符： / \\ : * ? " < > |');
+        }
+
+        const payload = { pack, author };
+        if (authorUrl) payload.authorUrl = authorUrl;
+        payload.items = configArr;
+
+        const blob = new Blob([JSON.stringify(payload, null, 4)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'imgs_config.json';
+        a.download = pack + '.json';
         a.click();
+        URL.revokeObjectURL(url);
     }
 </script>
 </body>
