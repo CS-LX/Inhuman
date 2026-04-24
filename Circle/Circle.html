@@ -214,7 +214,9 @@
 </div>
 
 <script>
-    let config = [];
+    const STEPS_PER_GAME = 5;
+
+    let roundItems = [];
     let currentIndex = 0;
     let errorCount = 0;
     let selectedPos = null;
@@ -224,6 +226,15 @@
     const statusMsg = document.getElementById('status-msg');
     const arrow = document.getElementById('success-arrow');
     const packCredit = document.getElementById('pack-credit');
+
+    // 把任意输入限制为 http(s) URL，否则返回 null（防 javascript:/data: URI XSS）
+    function safeHref(url) {
+        if (!url) return null;
+        try {
+            const u = new URL(url, window.location.href);
+            return (u.protocol === 'http:' || u.protocol === 'https:') ? u.href : null;
+        } catch { return null; }
+    }
 
     // Fisher–Yates 洗牌
     function shuffle(arr) {
@@ -242,7 +253,6 @@
                 pack: fallbackName,
                 author: 'unknown',
                 authorUrl: null,
-                description: '',
                 items: raw
             };
         }
@@ -251,7 +261,6 @@
                 pack: raw.pack || fallbackName,
                 author: raw.author || 'unknown',
                 authorUrl: raw.authorUrl || null,
-                description: raw.description || '',
                 items: raw.items
             };
         }
@@ -300,8 +309,7 @@
                 throw new Error('所有 pack 均加载失败或为空');
             }
 
-            shuffle(pool);
-            config = pool.slice(0, Math.min(5, pool.length));
+            roundItems = shuffle(pool).slice(0, STEPS_PER_GAME);
             loadStep(0);
         } catch (err) {
             console.error(err);
@@ -320,13 +328,12 @@
         }
         const author = item.__author && item.__author !== 'unknown' ? item.__author : null;
         const displayName = author || '匿名';
-        const prefix = document.createTextNode('本关由 ');
-        const suffix = document.createTextNode(' 提供');
+        const href = author ? safeHref(item.__authorUrl) : null;
         packCredit.textContent = '';
-        packCredit.appendChild(prefix);
-        if (author && item.__authorUrl) {
+        packCredit.appendChild(document.createTextNode('本关由 '));
+        if (href) {
             const a = document.createElement('a');
-            a.href = item.__authorUrl;
+            a.href = href;
             a.target = '_blank';
             a.rel = 'noopener';
             a.textContent = '@' + displayName;
@@ -334,27 +341,28 @@
         } else {
             packCredit.appendChild(document.createTextNode(author ? '@' + displayName : displayName));
         }
-        packCredit.appendChild(suffix);
+        packCredit.appendChild(document.createTextNode(' 提供'));
     }
 
     // 初始化加载
     function loadStep(index) {
-        if (index >= config.length) {
+        if (index >= roundItems.length) {
             alert("验证成功！");
             window.location.href = "https://www.bilibili.com/video/BV1dyXqBaEE5/";
             return;
         }
 
-        const data = config[index];
+        const data = roundItems[index];
         const content = document.getElementById('click-area');
         
         // 淡出效果
         content.classList.add('fade-out');
+        // 作者署名立刻刷新，不陪图片等 500ms
+        updatePackCredit(data);
         
         setTimeout(() => {
             document.getElementById('ref-img').src = data.ref;
             document.getElementById('verify-img').src = data.verify;
-            updatePackCredit(data);
             
             // 重置状态
             redCircle.style.display = 'none';
@@ -397,7 +405,7 @@
             return;
         }
 
-        const target = config[currentIndex].target;
+        const target = roundItems[currentIndex].target;
         const dist = Math.sqrt(Math.pow(selectedPos.px - target.x, 2) + Math.pow(selectedPos.py - target.y, 2));
 
         // 判断是否在目标范围内（阈值设为 0.1 相对单位，可根据难易度调整）
