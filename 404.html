@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>404 · 你已经不是人了 | Inhuman</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A4%96%3C/text%3E%3C/svg%3E">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html, body {
+            height: 100%;
+            font-family: "HarmonyOS Sans", "PingFang SC", "Microsoft YaHei",
+                         -apple-system, BlinkMacSystemFont, sans-serif;
+            color: #e8e8f0;
+            background:
+                radial-gradient(circle at 20% 20%, rgba(167, 139, 250, 0.25), transparent 40%),
+                radial-gradient(circle at 80% 80%, rgba(255, 46, 154, 0.22), transparent 45%),
+                linear-gradient(180deg, #0a0a14 0%, #111126 100%);
+            display: grid;
+            place-items: center;
+            overflow: hidden;
+        }
+
+        .container {
+            text-align: center;
+            padding: 40px;
+            max-width: 560px;
+            position: relative;
+        }
+
+        .code {
+            font-size: clamp(100px, 22vw, 200px);
+            font-weight: 900;
+            line-height: 1;
+            background: linear-gradient(120deg, #00e5ff 0%, #a78bfa 50%, #ff2e9a 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            letter-spacing: -4px;
+            position: relative;
+            animation: glitch 5s infinite;
+        }
+
+        @keyframes glitch {
+            0%, 95%, 100% { transform: translate(0); }
+            96% { transform: translate(-3px, 1px); }
+            97% { transform: translate(2px, -2px); }
+            98% { transform: translate(-1px, 2px); }
+        }
+
+        h1 {
+            font-size: clamp(22px, 4vw, 32px);
+            font-weight: 700;
+            margin: 20px 0 12px;
+            letter-spacing: 1px;
+        }
+
+        p {
+            font-size: 15px;
+            color: #9aa0b4;
+            line-height: 1.7;
+            margin-bottom: 32px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 28px;
+            font-size: 15px;
+            font-weight: 600;
+            color: #0a0a14;
+            background: linear-gradient(90deg, #00e5ff, #a78bfa);
+            border-radius: 999px;
+            text-decoration: none;
+            transition: transform 0.25s, box-shadow 0.25s;
+            box-shadow: 0 10px 30px -10px rgba(0, 229, 255, 0.6);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 14px 40px -10px rgba(0, 229, 255, 0.8);
+        }
+
+        .hint {
+            margin-top: 24px;
+            font-size: 12px;
+            color: #6b718a;
+            font-family: ui-monospace, "JetBrains Mono", Menlo, monospace;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="code">404</div>
+    <h1>检测结果：你走错地方了</h1>
+    <p>
+        这个页面消失了、不存在、或者从未被创造出来。<br>
+        根据《整活协议》第 404 条，建议返回主页重新开始验证。
+    </p>
+    <a class="btn" href="./">
+        ← 回到人类世界
+    </a>
+    <div class="hint">error_code: UNREACHABLE_URL · status: HUMAN_LOST</div>
+</div>
+
+</body>
+</html>

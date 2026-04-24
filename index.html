@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inhuman · 整活网页合集</title>
+    <meta name="description" content="一堆不按常理出牌的整活小网页合集 —— 验证码、假网盘、注册中心……欢迎来玩。">
+    <meta property="og:title" content="Inhuman · 整活网页合集">
+    <meta property="og:description" content="一堆不按常理出牌的整活小网页合集">
+    <meta property="og:type" content="website">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A4%96%3C/text%3E%3C/svg%3E">
+    <style>
+        :root {
+            --bg-0: #0a0a14;
+            --bg-1: #111126;
+            --bg-2: #1a1a33;
+            --accent-cyan: #00e5ff;
+            --accent-pink: #ff2e9a;
+            --accent-purple: #a78bfa;
+            --text-primary: #e8e8f0;
+            --text-secondary: #9aa0b4;
+            --card-border: rgba(167, 139, 250, 0.18);
+            --card-hover-border: rgba(0, 229, 255, 0.55);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            min-height: 100vh;
+            font-family: "HarmonyOS Sans", "PingFang SC", "Microsoft YaHei",
+                         -apple-system, BlinkMacSystemFont, sans-serif;
+            color: var(--text-primary);
+            background: var(--bg-0);
+            overflow-x: hidden;
+        }
+
+        /* 背景装饰：渐变 + 网格 + 光斑 */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background:
+                radial-gradient(circle at 15% 10%, rgba(167, 139, 250, 0.22), transparent 40%),
+                radial-gradient(circle at 85% 20%, rgba(0, 229, 255, 0.18), transparent 45%),
+                radial-gradient(circle at 50% 100%, rgba(255, 46, 154, 0.18), transparent 50%),
+                linear-gradient(180deg, var(--bg-0) 0%, var(--bg-1) 100%);
+            z-index: -2;
+        }
+
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+            background-size: 48px 48px;
+            mask-image: radial-gradient(ellipse at center, black 40%, transparent 90%);
+            -webkit-mask-image: radial-gradient(ellipse at center, black 40%, transparent 90%);
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        /* ============ 顶栏 ============ */
+        header {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            background: rgba(10, 10, 20, 0.55);
+            border-bottom: 1px solid rgba(167, 139, 250, 0.15);
+        }
+
+        .nav {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 16px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 18px;
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+
+        .logo .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--accent-cyan);
+            box-shadow: 0 0 12px var(--accent-cyan);
+            animation: pulse 1.8s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.25); }
+        }
+
+        .logo .brand {
+            background: linear-gradient(90deg, var(--accent-cyan), var(--accent-pink));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 24px;
+            align-items: center;
+        }
+
+        .nav-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 14px;
+            transition: color 0.2s;
+        }
+
+        .nav-links a:hover { color: var(--accent-cyan); }
+
+        .github-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 14px;
+            border: 1px solid var(--card-border);
+            border-radius: 999px;
+            color: var(--text-primary) !important;
+            transition: all 0.25s;
+        }
+
+        .github-btn:hover {
+            border-color: var(--accent-cyan);
+            background: rgba(0, 229, 255, 0.08);
+            transform: translateY(-1px);
+        }
+
+        /* ============ Hero ============ */
+        .hero {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 80px 32px 40px;
+            text-align: center;
+            position: relative;
+        }
+
+        .tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            font-size: 12px;
+            color: var(--accent-cyan);
+            background: rgba(0, 229, 255, 0.08);
+            border: 1px solid rgba(0, 229, 255, 0.25);
+            border-radius: 999px;
+            margin-bottom: 24px;
+            letter-spacing: 1px;
+        }
+
+        .tag::before {
+            content: '';
+            width: 6px;
+            height: 6px;
+            background: var(--accent-cyan);
+            border-radius: 50%;
+            box-shadow: 0 0 8px var(--accent-cyan);
+        }
+
+        .hero h1 {
+            font-size: clamp(36px, 6vw, 64px);
+            font-weight: 800;
+            line-height: 1.15;
+            margin-bottom: 20px;
+            letter-spacing: -0.5px;
+        }
+
+        .hero h1 .grad {
+            background: linear-gradient(120deg, var(--accent-cyan) 0%, var(--accent-purple) 50%, var(--accent-pink) 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+
+        .hero p {
+            font-size: clamp(15px, 1.5vw, 18px);
+            color: var(--text-secondary);
+            max-width: 640px;
+            margin: 0 auto 32px;
+            line-height: 1.7;
+        }
+
+        .stats {
+            display: inline-flex;
+            gap: 32px;
+            padding: 14px 28px;
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            background: rgba(26, 26, 51, 0.5);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-num {
+            display: block;
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--accent-cyan);
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+
+        .divider {
+            width: 1px;
+            background: var(--card-border);
+        }
+
+        /* ============ 卡片网格 ============ */
+        main {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 40px 32px 100px;
+        }
+
+        .section-title {
+            display: flex;
+            align-items: baseline;
+            gap: 12px;
+            margin-bottom: 28px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--card-border);
+        }
+
+        .section-title h2 {
+            font-size: 22px;
+            font-weight: 700;
+        }
+
+        .section-title span {
+            font-size: 13px;
+            color: var(--text-secondary);
+            font-family: ui-monospace, "JetBrains Mono", Menlo, monospace;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 22px;
+        }
+
+        .card {
+            position: relative;
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 26px;
+            background: linear-gradient(165deg, rgba(26, 26, 51, 0.7) 0%, rgba(17, 17, 38, 0.7) 100%);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            text-decoration: none;
+            color: inherit;
+            transition: transform 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.1),
+                        border-color 0.25s,
+                        box-shadow 0.35s;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            min-height: 220px;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at var(--mx, 50%) var(--my, 50%),
+                        rgba(0, 229, 255, 0.14), transparent 40%);
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+            border-color: var(--card-hover-border);
+            box-shadow:
+                0 20px 40px -20px rgba(0, 229, 255, 0.35),
+                0 0 0 1px rgba(0, 229, 255, 0.15);
+        }
+
+        .card:hover::before { opacity: 1; }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 16px;
+        }
+
+        .card-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: grid;
+            place-items: center;
+            font-size: 26px;
+            background: linear-gradient(135deg, rgba(0, 229, 255, 0.18), rgba(167, 139, 250, 0.18));
+            border: 1px solid rgba(167, 139, 250, 0.25);
+        }
+
+        .bv-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 4px 10px;
+            font-size: 11px;
+            color: #ff7ab8;
+            background: rgba(255, 46, 154, 0.08);
+            border: 1px solid rgba(255, 46, 154, 0.25);
+            border-radius: 999px;
+            text-decoration: none;
+            font-family: ui-monospace, "JetBrains Mono", Menlo, monospace;
+            transition: all 0.2s;
+            z-index: 2;
+            position: relative;
+        }
+
+        .bv-badge:hover {
+            background: rgba(255, 46, 154, 0.18);
+            color: #fff;
+        }
+
+        .card h3 {
+            font-size: 19px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            letter-spacing: 0.3px;
+        }
+
+        .card .desc {
+            font-size: 13.5px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            flex: 1;
+            margin-bottom: 18px;
+        }
+
+        .card-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 14px;
+            border-top: 1px dashed var(--card-border);
+        }
+
+        .card-path {
+            font-size: 11.5px;
+            color: var(--text-secondary);
+            font-family: ui-monospace, "JetBrains Mono", Menlo, monospace;
+            opacity: 0.7;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+            max-width: 60%;
+        }
+
+        .enter-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--accent-cyan);
+            transition: transform 0.25s;
+        }
+
+        .card:hover .enter-btn {
+            transform: translateX(4px);
+        }
+
+        /* ============ 页脚 ============ */
+        footer {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 40px 32px;
+            text-align: center;
+            border-top: 1px solid var(--card-border);
+            color: var(--text-secondary);
+            font-size: 13px;
+        }
+
+        footer a {
+            color: var(--accent-cyan);
+            text-decoration: none;
+        }
+
+        footer a:hover { text-decoration: underline; }
+
+        /* ============ 响应式 ============ */
+        @media (max-width: 640px) {
+            .nav { padding: 14px 18px; }
+            .nav-links { gap: 14px; }
+            .nav-links a:not(.github-btn) { display: none; }
+            .hero { padding: 50px 18px 30px; }
+            main { padding: 30px 18px 60px; }
+            .stats { gap: 18px; padding: 12px 18px; }
+            .grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <nav class="nav">
+        <div class="logo">
+            <span class="dot"></span>
+            <span class="brand">INHUMAN</span>
+        </div>
+        <div class="nav-links">
+            <a href="#projects">整活项目</a>
+            <a href="#about">关于</a>
+            <a class="github-btn" href="https://github.com/CS-LX/Inhuman" target="_blank" rel="noopener">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.73.5.5 5.73.5 12c0 5.08 3.29 9.39 7.86 10.92.58.11.79-.25.79-.56v-2.08c-3.2.7-3.87-1.37-3.87-1.37-.52-1.33-1.28-1.68-1.28-1.68-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.75 2.68 1.24 3.33.95.1-.74.4-1.24.73-1.53-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.18-3.08-.12-.29-.51-1.46.11-3.04 0 0 .97-.31 3.18 1.18.92-.26 1.91-.38 2.9-.38.99 0 1.98.13 2.9.38 2.2-1.49 3.17-1.18 3.17-1.18.63 1.58.24 2.75.12 3.04.74.8 1.18 1.83 1.18 3.08 0 4.41-2.69 5.39-5.25 5.67.41.35.78 1.04.78 2.1v3.11c0 .31.21.67.8.56A10.52 10.52 0 0 0 23.5 12C23.5 5.73 18.27.5 12 .5Z"/></svg>
+                GitHub
+            </a>
+        </div>
+    </nav>
+</header>
+
+<section class="hero">
+    <span class="tag">HUMANITY · TEST · FAILED</span>
+    <h1>
+        一个<span class="grad">不把你当人</span>的<br>
+        整活网页合集
+    </h1>
+    <p>
+        这里是一些不按常理出牌的小网页。<br>
+        它们长得像验证码、网盘、注册表单……
+        但点进去，你会发现，它们一个比一个抽象。
+    </p>
+    <div class="stats">
+        <div class="stat-item">
+            <span class="stat-num" id="stat-projects">6</span>
+            <span class="stat-label">整活项目</span>
+        </div>
+        <div class="divider"></div>
+        <div class="stat-item">
+            <span class="stat-num">∞</span>
+            <span class="stat-label">精神内耗</span>
+        </div>
+        <div class="divider"></div>
+        <div class="stat-item">
+            <span class="stat-num">0</span>
+            <span class="stat-label">实用价值</span>
+        </div>
+    </div>
+</section>
+
+<main id="projects">
+    <div class="section-title">
+        <h2>整活项目</h2>
+        <span>// click &amp; enjoy</span>
+    </div>
+    <div class="grid" id="project-grid"></div>
+</main>
+
+<footer id="about">
+    <p>
+        由 <a href="https://github.com/CS-LX" target="_blank" rel="noopener">CS-LX</a> 用爱发电 ·
+        源码见 <a href="https://github.com/CS-LX/Inhuman" target="_blank" rel="noopener">GitHub</a>
+    </p>
+    <p style="margin-top:6px; opacity: 0.7;">
+        © <span id="year"></span> Inhuman Collection · 仅供娱乐，请勿当真
+    </p>
+</footer>
+
+<script>
+    // 项目数据：folder 是真实文件夹名（含中括号），path 是入口 html 相对路径
+    const projects = [
+        {
+            title: "红圈验证",
+            subtitle: "证明你是人类 (HUMAN)",
+            desc: "找到匹配右侧图片的位置 —— 但那张参考图，好像并不按常理出牌。",
+            icon: "🔴",
+            folder: "Circle",
+            path: "Circle/Circle.html",
+            bv: null
+        },
+        {
+            title: "摆渡网盘",
+            subtitle: "文件分享页面",
+            desc: "一个熟悉得让人血压飙升的\"网盘\"。提取文件？先看完这个广告再说。",
+            icon: "📁",
+            folder: "NetDisk [BV1p8DeBtEN5]",
+            path: "NetDisk%20%5BBV1p8DeBtEN5%5D/NetDisk.html",
+            bv: "BV1p8DeBtEN5"
+        },
+        {
+            title: "预测长大的你",
+            subtitle: "AI 人生轨迹模拟",
+            desc: "输入一点点信息，让\"先进算法\"告诉你未来长什么样。保证不准。",
+            icon: "🔮",
+            folder: "Prediction [BV1XgAczLEq5]",
+            path: "Prediction%20%5BBV1XgAczLEq5%5D/Prediction.html",
+            bv: "BV1XgAczLEq5"
+        },
+        {
+            title: "用户身份统一注册中心",
+            subtitle: "请配合工作",
+            desc: "十分正经的注册流程，每一步都合理，合起来却让人想报警。",
+            icon: "🪪",
+            folder: "Registration [BV1hfieBqE3u]",
+            path: "Registration%20%5BBV1hfieBqE3u%5D/Registration.html",
+            bv: "BV1hfieBqE3u"
+        },
+        {
+            title: "西西弗斯验证码",
+            subtitle: "推石头上山",
+            desc: "上推一点，滑下一点，再上推一点……你只需要完成一次验证，仅此而已。",
+            icon: "🪨",
+            folder: "Sisyphus",
+            path: "Sisyphus/Sisyphus.html",
+            bv: null
+        },
+        {
+            title: "机器人身份验证",
+            subtitle: "证明你是机器人 (BOT)",
+            desc: "把柱状图按高度从小到大排好。1 秒内搞定才算通过哦 —— 人类再见。",
+            icon: "🤖",
+            folder: "Sort",
+            path: "Sort/Sort.html",
+            bv: null
+        }
+    ];
+
+    // 生成卡片
+    const grid = document.getElementById('project-grid');
+    const frag = document.createDocumentFragment();
+
+    projects.forEach((p) => {
+        const a = document.createElement('a');
+        a.className = 'card';
+        a.href = p.path;
+
+        const bvHtml = p.bv
+            ? `<a class="bv-badge" href="https://www.bilibili.com/video/${p.bv}" target="_blank" rel="noopener" onclick="event.stopPropagation();">
+                 <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M17.813 4.653h.854c1.51.054 2.769.578 3.773 1.574 1.004.995 1.524 2.249 1.56 3.76v7.36c-.036 1.51-.556 2.769-1.56 3.773s-2.262 1.524-3.773 1.56H5.333c-1.51-.036-2.769-.556-3.773-1.56S.036 18.858 0 17.347v-7.36c.036-1.511.556-2.765 1.56-3.76 1.004-.996 2.262-1.52 3.773-1.574h.774L4.46 3.34c-.173-.173-.26-.396-.26-.668 0-.272.087-.495.26-.668.174-.173.397-.26.668-.26.273 0 .496.087.668.26L8.907 4.62c.045.03.087.063.127.1h5.973c.037-.036.077-.068.117-.098l2.16-2.154c.172-.174.395-.26.668-.26.272 0 .495.086.668.258s.26.396.26.668c0 .273-.087.497-.26.67l-.708.686zM5.333 7.24c-.81.036-1.478.318-2.005.842-.527.523-.795 1.19-.805 1.995v7.27c.01.805.277 1.474.805 2.005.527.532 1.195.8 2.005.805h13.334c.81-.005 1.48-.273 2.005-.805.525-.531.79-1.2.795-2.005v-7.27c-.005-.805-.27-1.472-.795-1.995s-1.195-.806-2.005-.842zM8 11.107c.252 0 .463.085.634.254.17.17.256.38.256.634v1.28c0 .254-.086.464-.256.634A.866.866 0 0 1 8 14.16a.87.87 0 0 1-.633-.253.852.852 0 0 1-.254-.634v-1.28c0-.254.084-.464.254-.634A.862.862 0 0 1 8 11.107zm8 0c.254 0 .464.085.634.254.17.17.254.38.254.634v1.28c0 .254-.085.464-.254.634a.87.87 0 0 1-.634.253.866.866 0 0 1-.633-.253.852.852 0 0 1-.253-.634v-1.28c0-.254.084-.464.253-.634a.862.862 0 0 1 .633-.254z"/></svg>
+                 ${p.bv}
+               </a>`
+            : `<span class="bv-badge" style="color:#6b718a;border-color:rgba(154,160,180,0.2);background:transparent;">原创</span>`;
+
+        a.innerHTML = `
+            <div class="card-header">
+                <div class="card-icon">${p.icon}</div>
+                ${bvHtml}
+            </div>
+            <h3>${p.title}</h3>
+            <p class="desc"><strong style="color:#c7c9d6;">${p.subtitle}</strong> — ${p.desc}</p>
+            <div class="card-footer">
+                <span class="card-path">${p.folder}/</span>
+                <span class="enter-btn">进入整活 →</span>
+            </div>
+        `;
+
+        // 鼠标光斑跟随
+        a.addEventListener('mousemove', (e) => {
+            const r = a.getBoundingClientRect();
+            a.style.setProperty('--mx', ((e.clientX - r.left) / r.width * 100) + '%');
+            a.style.setProperty('--my', ((e.clientY - r.top) / r.height * 100) + '%');
+        });
+
+        frag.appendChild(a);
+    });
+
+    grid.appendChild(frag);
+
+    document.getElementById('stat-projects').textContent = projects.length;
+    document.getElementById('year').textContent = new Date().getFullYear();
+</script>
+
+</body>
+</html>
