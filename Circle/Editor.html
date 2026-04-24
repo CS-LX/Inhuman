@@ -64,12 +64,55 @@
         /* 投稿指南链接 */
         .contrib-link { font-size: 13px; color: var(--primary); text-decoration: none; display: block; text-align: center; margin-bottom: 10px; }
         .contrib-link:hover { text-decoration: underline; }
+
+        /* 引导 / 导出完成 弹窗 */
+        .modal-mask {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+            display: none; justify-content: center; align-items: center;
+            z-index: 1000;
+        }
+        .modal-mask.show { display: flex; }
+        .modal-card {
+            background: #fff; border-radius: 10px; padding: 28px 32px;
+            max-width: 480px; width: 90%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+            animation: pop 0.25s ease;
+        }
+        @keyframes pop { from { transform: scale(0.92); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .modal-card h2 { margin: 0 0 12px; font-size: 18px; }
+        .modal-card p { margin: 8px 0; font-size: 14px; line-height: 1.7; color: #555; }
+        .modal-card ol { padding-left: 20px; margin: 10px 0; font-size: 14px; line-height: 1.8; color: #555; }
+        .modal-card ol code { background: #f4f7f9; padding: 1px 6px; border-radius: 3px; font-size: 12px; }
+        .modal-actions { margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px; }
+        .modal-actions .btn { padding: 8px 18px; }
+        .btn-ghost { background: transparent; color: #888; }
+        .btn-ghost:hover { color: #333; }
+
+        /* 顶栏教程横幅 */
+        .tutor-banner {
+            background: linear-gradient(90deg, #fffbe6, #fff8d6);
+            border: 1px solid #ffe58f;
+            color: #614700;
+            padding: 8px 14px;
+            border-radius: 6px;
+            font-size: 13px;
+            margin-bottom: 12px;
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 10px;
+        }
+        .tutor-banner a { color: var(--primary); font-weight: bold; text-decoration: none; }
+        .tutor-banner a:hover { text-decoration: underline; }
     </style>
 </head>
 <body>
 
 <div id="sidebar">
     <h3 style="margin-top:0">配置管理</h3>
+
+    <div class="tutor-banner">
+        <span>第一次来？想合并到主仓库 →</span>
+        <a href="#" onclick="showTutorial(); return false;">看 30 秒教程</a>
+    </div>
 
     <div class="meta-group">
         <label>作者名 <span style="color:#ff4d4f">*</span></label>
@@ -123,7 +166,64 @@
     </div>
 </div>
 
+<div class="modal-mask" id="modal-tutorial">
+    <div class="modal-card">
+        <h2>👋 想把你的关卡放进 Circle.html 的轮播池？</h2>
+        <p>整个流程就 4 步：</p>
+        <ol>
+            <li>左上角填好 <strong>作者名 / Pack 名</strong>，路径前缀改成 <code>imgs/&lt;你的用户名&gt;/</code></li>
+            <li>上传图片对、拖红圈定位、加入列表（至少 2 关）</li>
+            <li>点 <strong>导出 pack JSON</strong></li>
+            <li>把图片和 JSON 提交到对应目录，发 PR</li>
+        </ol>
+        <p style="font-size:13px; color:#888;">完整步骤、目录约定、PR 模板都在投稿指南里。</p>
+        <div class="modal-actions">
+            <button class="btn btn-ghost" onclick="hideModal('modal-tutorial')">先随便看看</button>
+            <a class="btn btn-primary" href="./CONTRIBUTING.md" target="_blank" style="text-decoration:none; display:inline-block;">打开投稿指南 →</a>
+        </div>
+    </div>
+</div>
+
+<div class="modal-mask" id="modal-exported">
+    <div class="modal-card">
+        <h2>🎉 导出成功！但还没结束</h2>
+        <p>这个 JSON 现在只在你电脑上。要让大家能玩到，还需要：</p>
+        <ol>
+            <li>把所有 PNG 放到 <code>Circle/imgs/&lt;你的用户名&gt;/</code></li>
+            <li>把 JSON 放到 <code>Circle/configs/</code></li>
+            <li>在 <code>Circle/configs/manifest.json</code> 的 packs 数组里加上你的文件名</li>
+            <li>提交 PR，描述里说一句你的整活思路</li>
+        </ol>
+        <p style="font-size:13px; color:#888;">具体细节看投稿指南，里面有 PR 模板可以直接抄。</p>
+        <div class="modal-actions">
+            <button class="btn btn-ghost" onclick="hideModal('modal-exported')">知道了</button>
+            <a class="btn btn-primary" href="./CONTRIBUTING.md" target="_blank" style="text-decoration:none; display:inline-block;">看投稿指南 →</a>
+        </div>
+    </div>
+</div>
+
 <script>
+    // --- Modal 控制 ---
+    function showModal(id) { document.getElementById(id).classList.add('show'); }
+    function hideModal(id) { document.getElementById(id).classList.remove('show'); }
+    function showTutorial() { showModal('modal-tutorial'); }
+
+    // 首次进入（localStorage 没标记过）自动弹教程
+    try {
+        if (!localStorage.getItem('circle-editor-tutor-seen')) {
+            // 等 DOM 就绪后弹
+            document.addEventListener('DOMContentLoaded', () => showModal('modal-tutorial'));
+            localStorage.setItem('circle-editor-tutor-seen', '1');
+        }
+    } catch (_) { /* 隐私模式 / localStorage 被禁，忽略 */ }
+
+    // 点遮罩空白处关闭
+    document.addEventListener('click', (e) => {
+        if (e.target.classList && e.target.classList.contains('modal-mask')) {
+            e.target.classList.remove('show');
+        }
+    });
+
     let configArr = [];
     let editingIndex = -1;
     let currentData = { ref: '', verify: '', x: 0.5, y: 0.5, radius: 30 };
@@ -349,6 +449,9 @@
         a.download = pack + '.json';
         a.click();
         URL.revokeObjectURL(url);
+
+        // 导出成功后弹出"下一步该干啥"，确保用户不会以为导出 = 完成
+        showModal('modal-exported');
     }
 </script>
 </body>
