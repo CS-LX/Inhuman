@@ -5,40 +5,120 @@
     <title>内定必中大转盘</title>
     <style>
         :root {
-            --primary-color: #ff4757;
-            --gold-color: #ffa502;
+            --page-bg: #ffffff;
+            --text: #1e293b;
+            --primary-color: #ff1744;
+            --spin-color: #ff6d00;
+            --settings-color: #2979ff;
+            --gold-color: #ffb300;
         }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
-            background: #2f3542;
-            color: white;
+            background: var(--page-bg);
+            color: var(--text);
             margin: 0;
             overflow: hidden;
         }
 
-        /* UI 控制区 */
-        #controls {
-            margin: 20px;
-            padding: 15px;
-            background: rgba(255,255,255,0.1);
-            border-radius: 10px;
+        .main-toolbar {
+            margin-top: 24px;
             display: flex;
-            gap: 10px;
+            flex-wrap: wrap;
+            gap: 12px;
+            justify-content: center;
             z-index: 10;
         }
-        input, select, button {
-            padding: 8px;
-            border-radius: 5px;
+        .main-toolbar button {
+            padding: 12px 22px;
+            border-radius: 10px;
             border: none;
-        }
-        button {
-            background: var(--primary-color);
-            color: white;
+            color: #fff;
             cursor: pointer;
             font-weight: bold;
+            font-size: 1rem;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+        }
+        #openConfigBtn {
+            background: var(--settings-color);
+        }
+        #startSpinMainBtn {
+            background: linear-gradient(135deg, var(--primary-color), var(--spin-color));
+        }
+
+        /* 二级配置 Dialog */
+        #configDialog {
+            position: fixed;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 900;
+        }
+        #configDialog.is-open {
+            display: flex;
+        }
+        .config-dialog-backdrop {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.55);
+        }
+        .config-dialog-panel {
+            position: relative;
+            margin: 16px;
+            padding: 20px;
+            max-width: min(520px, 100vw - 32px);
+            width: 100%;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(0, 0, 0, 0.06);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            z-index: 1;
+            color: var(--text);
+        }
+        .config-dialog-panel h2 {
+            margin: 0 0 4px;
+            font-size: 1.15rem;
+            font-weight: 600;
+        }
+        .config-dialog-panel label {
+            font-size: 0.85rem;
+            opacity: 0.85;
+        }
+        .config-dialog-panel input[type="text"],
+        .config-dialog-panel select {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+            background: #f8fafc;
+        }
+        .config-dialog-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 8px;
+        }
+        .config-dialog-actions button {
+            padding: 10px 16px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .config-dialog-actions .btn-primary {
+            background: var(--primary-color);
+            color: white;
+        }
+        .config-dialog-actions .btn-secondary {
+            background: #e2e8f0;
+            color: var(--text);
         }
 
         /* 转盘容器 */
@@ -46,7 +126,7 @@
             position: relative;
             width: 500px;
             height: 500px;
-            margin-top: 50px;
+            margin-top: 32px;
         }
 
         #wheelCanvas, #textCanvas {
@@ -54,20 +134,21 @@
             top: 0;
             left: 0;
             border-radius: 50%;
-            box-shadow: 0 0 50px rgba(0,0,0,0.5);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), 0 0 0 4px rgba(255, 255, 255, 0.9);
         }
 
-        /* 指针 */
+        /* 指针：viewBox 中心 (50,50) 与圆盘中心对齐，尖端朝正上方 */
         .pointer {
             position: absolute;
-            top: -20px;
             left: 50%;
-            transform: translateX(-50%);
-            width: 40px;
-            height: 60px;
+            top: 50%;
+            width: 72px;
+            height: 72px;
+            transform: translate(-50%, -50%);
             fill: var(--gold-color);
-            filter: drop-shadow(0 5px 5px rgba(0,0,0,0.5));
+            filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.25));
             z-index: 100;
+            pointer-events: none;
         }
 
         /* 胜利弹窗 */
@@ -77,34 +158,60 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0,0,0,0.8);
+            background: rgba(0, 0, 0, 0.8);
             display: none;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             z-index: 1000;
-            animation: fadeIn 0.5s;
+            animation: overlayFadeIn 0.35s ease-out;
+            color: #fff;
         }
         #overlay h1 {
             font-size: 4rem;
             color: var(--gold-color);
-            text-shadow: 0 0 20px var(--gold-color);
+            text-shadow: 0 0 24px rgba(255, 179, 0, 0.75);
             margin: 0;
         }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        #overlay h1.replay {
+            animation: prizePop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        @keyframes overlayFadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes prizePop {
+            from { transform: scale(0.6); opacity: 0; filter: blur(6px); }
+            to { transform: scale(1); opacity: 1; filter: blur(0); }
+        }
     </style>
 </head>
 <body>
 
-<div id="controls">
-    <input type="text" id="itemInput" value="特等奖,一等奖,谢谢惠顾,二等奖,三等奖,再来一次">
-    <select id="targetSelect"></select>
-    <button onclick="startSpin()">开始抽奖</button>
+<div class="main-toolbar">
+    <button type="button" id="openConfigBtn">设置</button>
+    <button type="button" id="startSpinMainBtn">开始抽奖</button>
+</div>
+
+<div id="configDialog" role="dialog" aria-modal="true" aria-labelledby="configDialogTitle">
+    <div class="config-dialog-backdrop" id="configDialogBackdrop"></div>
+    <div class="config-dialog-panel" id="configDialogPanel">
+        <h2 id="configDialogTitle">抽奖配置</h2>
+        <div>
+            <label for="itemInput">奖项列表（英文逗号分隔）</label>
+            <input type="text" id="itemInput" value="特等奖,一等奖,谢谢惠顾,二等奖,三等奖,再来一次">
+        </div>
+        <div>
+            <label for="targetSelect">内定必中项</label>
+            <select id="targetSelect"></select>
+        </div>
+        <div class="config-dialog-actions">
+            <button type="button" class="btn-primary" id="startSpinBtn">开始抽奖</button>
+            <button type="button" class="btn-secondary" id="closeConfigBtn">关闭</button>
+        </div>
+    </div>
 </div>
 
 <div class="wheel-container">
-    <svg class="pointer" viewBox="0 0 100 100">
-        <path d="M50 100 L20 20 A30 30 0 1 1 80 20 Z" />
+    <svg class="pointer" viewBox="0 0 100 100" aria-hidden="true">
+        <path d="M50 50 L44 16 L50 4 L56 16 Z" />
     </svg>
     <canvas id="wheelCanvas" width="500" height="500"></canvas>
     <canvas id="textCanvas" width="500" height="500"></canvas>
@@ -125,26 +232,59 @@
     const targetSelect = document.getElementById('targetSelect');
     const prizeNameDisplay = document.getElementById('prizeName');
     const overlay = document.getElementById('overlay');
+    const configDialog = document.getElementById('configDialog');
+    const configDialogBackdrop = document.getElementById('configDialogBackdrop');
+    const openConfigBtn = document.getElementById('openConfigBtn');
+    const closeConfigBtn = document.getElementById('closeConfigBtn');
+    const startSpinBtn = document.getElementById('startSpinBtn');
+    const startSpinMainBtn = document.getElementById('startSpinMainBtn');
+
+    const SEGMENT_PALETTE = ['#FF1744', '#FFEA00', '#00E676', '#2979FF', '#E040FB', '#FF9100'];
 
     let items = [];
     let isSpinning = false;
-    let rotation = 0; // 当前弧度
-    let angularVelocity = 0;
+    let rotation = 0;
+
+    function openConfigDialog() {
+        configDialog.classList.add('is-open');
+        itemInput.focus();
+    }
+
+    function closeConfigDialog() {
+        configDialog.classList.remove('is-open');
+    }
+
+    openConfigBtn.addEventListener('click', openConfigDialog);
+    closeConfigBtn.addEventListener('click', closeConfigDialog);
+    configDialogBackdrop.addEventListener('click', closeConfigDialog);
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && configDialog.classList.contains('is-open')) {
+            closeConfigDialog();
+        }
+    });
+
+    startSpinBtn.addEventListener('click', () => {
+        startSpin();
+    });
+    startSpinMainBtn.addEventListener('click', () => {
+        startSpin();
+    });
 
     // 初始化/更新
     function updateItems() {
         items = itemInput.value.split(',').filter(i => i.trim() !== "");
         targetSelect.innerHTML = items.map((it, i) => `<option value="${i}">${it}</option>`).join('');
-        drawWheel(0);
+        resetToTarget();
     }
-    itemInput.onchange = updateItems;
+    itemInput.addEventListener('change', updateItems);
     updateItems();
 
-    function drawWheel(currentRot, moveText = true) {
+    /** 背景层（色块）：wheelCanvas，随 currentRot 旋转。 */
+    function drawWheelBackground(currentRot) {
         const n = items.length;
         const arc = (Math.PI * 2) / n;
 
-        // 绘制背景圆盘
         wheelCtx.clearRect(0, 0, 500, 500);
         wheelCtx.save();
         wheelCtx.translate(250, 250);
@@ -152,52 +292,87 @@
 
         for (let i = 0; i < n; i++) {
             wheelCtx.beginPath();
-            wheelCtx.fillStyle = i % 2 === 0 ? '#ff4757' : '#2f3542';
+            wheelCtx.fillStyle = SEGMENT_PALETTE[i % SEGMENT_PALETTE.length];
             wheelCtx.moveTo(0, 0);
             wheelCtx.arc(0, 0, 240, i * arc, (i + 1) * arc);
             wheelCtx.fill();
-            wheelCtx.strokeSStyle = "rgba(255,255,255,0.1)";
+            wheelCtx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+            wheelCtx.lineWidth = 2;
             wheelCtx.stroke();
         }
         wheelCtx.restore();
+    }
 
-        // 绘制文字图层
+    /**
+     * 文字层：textCanvas。
+     * @param {number} currentRot 背景层当前角（弧度）
+     * @param {boolean} textFollowsWheel true 整盘同转；false 图层分离（文字角固定在屏幕，不乘 currentRot）
+     */
+    function drawWheelText(currentRot, textFollowsWheel) {
+        const n = items.length;
+        const arc = (Math.PI * 2) / n;
+
         textCtx.clearRect(0, 0, 500, 500);
         textCtx.save();
         textCtx.translate(250, 250);
-        if(moveText) textCtx.rotate(currentRot);
+        if (textFollowsWheel) textCtx.rotate(currentRot);
 
-        textCtx.fillStyle = "white";
-        textCtx.font = "bold 18px Arial";
-        textCtx.textAlign = "right";
+        textCtx.font = 'bold 18px Arial';
+        textCtx.textAlign = 'right';
+        textCtx.lineJoin = 'round';
+        textCtx.miterLimit = 2;
 
         for (let i = 0; i < n; i++) {
             textCtx.save();
-            textCtx.rotate(i * arc + arc / 2);
+            // 跟盘：与色块扇区中心一致。不跟盘：屏幕固定坐标，正上方 -π/2 为索引 0，顺时针对应 i 增大。
+            const textAngle = textFollowsWheel ? (i * arc + arc / 2) : (-Math.PI / 2 + i * arc);
+            textCtx.rotate(textAngle);
+            textCtx.lineWidth = 4;
+            textCtx.strokeStyle = 'rgba(0, 0, 0, 0.35)';
+            textCtx.strokeText(items[i], 210, 10);
+            textCtx.fillStyle = '#ffffff';
             textCtx.fillText(items[i], 210, 10);
             textCtx.restore();
         }
         textCtx.restore();
     }
 
-    // 重置到必中项处于正上方
+    function drawWheel(currentRot, textFollowsWheel = true) {
+        const n = items.length;
+        if (n === 0) {
+            wheelCtx.clearRect(0, 0, 500, 500);
+            textCtx.clearRect(0, 0, 500, 500);
+            return;
+        }
+        drawWheelBackground(currentRot);
+        drawWheelText(currentRot, textFollowsWheel);
+    }
+
     function resetToTarget() {
-        const targetIndex = parseInt(targetSelect.value);
+        if (items.length === 0) {
+            wheelCtx.clearRect(0, 0, 500, 500);
+            textCtx.clearRect(0, 0, 500, 500);
+            return;
+        }
+        const targetIndex = parseInt(targetSelect.value, 10);
         const n = items.length;
         const arc = (Math.PI * 2) / n;
-        // 目标项的中点在正上方( -Math.PI/2 )
-        rotation = - (targetIndex * arc + arc / 2) - Math.PI / 2;
-        drawWheel(rotation);
+        // 必中项扇区中心对准指针方向（画布向上 = -π/2）
+        rotation = -(targetIndex * arc + arc / 2) - Math.PI / 2;
+        drawWheel(rotation, true);
     }
-    targetSelect.onchange = resetToTarget;
+    targetSelect.addEventListener('change', resetToTarget);
     resetToTarget();
 
     function startSpin() {
-        if (isSpinning) return;
+        if (isSpinning || items.length === 0) return;
         isSpinning = true;
 
+        // 开抽前：必中项对准正上方，静止态字与扇区对齐（真转盘观感）
+        resetToTarget();
+
+        // 随机修改器：图层分离（仅色块转）| 重力（整盘同转 + 单摆阻尼）
         const mode = Math.random() > 0.5 ? 'layer' : 'gravity';
-        const targetIndex = parseInt(targetSelect.value);
 
         if (mode === 'layer') {
             runLayerModifier();
@@ -206,47 +381,49 @@
         }
     }
 
-    // 修改器 1：图层分离
+    /**
+     * 修改器「图层分离」：仅 wheelCanvas 随 currentRot 转；文字层不乘 currentRot。
+     * 停稳后仍须 drawWheel(..., false)，禁止最后一帧改为 true 贴回扇区（破坏设计并造成顶格文案突变）。
+     */
     function runLayerModifier() {
         let startTime = null;
         const duration = 4000;
         const totalSpins = 10 * Math.PI * 2;
+        const rotationStart = rotation;
 
         function animate(time) {
             if (!startTime) startTime = time;
-            let progress = (time - startTime) / duration;
-
+            const progress = Math.min((time - startTime) / duration, 1);
+            const easeOut = 1 - Math.pow(1 - progress, 3);
+            const currentPos = rotationStart + easeOut * totalSpins;
+            drawWheel(currentPos, false);
             if (progress < 1) {
-                // 背景转动，文字不动
-                let easeOut = 1 - Math.pow(1 - progress, 3);
-                let currentPos = rotation + easeOut * totalSpins;
-                drawWheel(currentPos, false);
                 requestAnimationFrame(animate);
             } else {
+                rotation = rotationStart + totalSpins;
+                drawWheel(rotation, false);
                 finishSpin();
             }
         }
         requestAnimationFrame(animate);
     }
 
-    // 修改器 2：重力加速（模拟单摆物理）
+    /** 修改器「重力」：文字与转盘同角；对侧挂重等效为有阻尼单摆，平衡于必中项在正上 */
     function runGravityModifier() {
-        let vel = 0.5 + Math.random() * 0.2; // 初始速度
-        let friction = 0.985;
-        let gravity = 0.002;
+        let vel = 0.45 + Math.random() * 0.25;
+        const friction = 0.985;
+        const gravity = 0.002;
 
-        const targetIndex = parseInt(targetSelect.value);
+        const targetIndex = parseInt(targetSelect.value, 10);
         const n = items.length;
         const arc = (Math.PI * 2) / n;
-
-        // 目标弧度偏移（正上方）
-        const targetTheta = - (targetIndex * arc + arc / 2) - Math.PI / 2;
+        const targetTheta = -(targetIndex * arc + arc / 2) - Math.PI / 2;
 
         function animate() {
-            // 物理公式：模拟重心在必中项的对面
-            // 重力加速度 alpha = -g * sin(theta - target)
             let delta = rotation - targetTheta;
-            let gravityEffect = -gravity * Math.sin(delta);
+            while (delta > Math.PI) delta -= 2 * Math.PI;
+            while (delta < -Math.PI) delta += 2 * Math.PI;
+            const gravityEffect = -gravity * Math.sin(delta);
 
             vel += gravityEffect;
             vel *= friction;
@@ -254,8 +431,8 @@
 
             drawWheel(rotation, true);
 
-            if (Math.abs(vel) < 0.001 && Math.abs(Math.sin(delta)) < 0.05) {
-                rotation = targetTheta; // 强行吸附收尾
+            if (Math.abs(vel) < 0.0015 && Math.abs(delta) < 0.02) {
+                rotation = targetTheta;
                 drawWheel(rotation, true);
                 finishSpin();
             } else {
@@ -267,8 +444,13 @@
 
     function finishSpin() {
         isSpinning = false;
-        prizeNameDisplay.innerText = items[targetSelect.value];
+        const idx = parseInt(targetSelect.value, 10);
+        prizeNameDisplay.innerText = items[idx] ?? '';
         overlay.style.display = 'flex';
+        void prizeNameDisplay.offsetWidth;
+        prizeNameDisplay.classList.remove('replay');
+        void prizeNameDisplay.offsetWidth;
+        prizeNameDisplay.classList.add('replay');
     }
 </script>
 
