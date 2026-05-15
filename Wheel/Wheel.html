@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>内定必中大转盘</title>
+    <style>
+        :root {
+            --primary-color: #ff4757;
+            --gold-color: #ffa502;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: #2f3542;
+            color: white;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        /* UI 控制区 */
+        #controls {
+            margin: 20px;
+            padding: 15px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            display: flex;
+            gap: 10px;
+            z-index: 10;
+        }
+        input, select, button {
+            padding: 8px;
+            border-radius: 5px;
+            border: none;
+        }
+        button {
+            background: var(--primary-color);
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        /* 转盘容器 */
+        .wheel-container {
+            position: relative;
+            width: 500px;
+            height: 500px;
+            margin-top: 50px;
+        }
+
+        #wheelCanvas, #textCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            border-radius: 50%;
+            box-shadow: 0 0 50px rgba(0,0,0,0.5);
+        }
+
+        /* 指针 */
+        .pointer {
+            position: absolute;
+            top: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 40px;
+            height: 60px;
+            fill: var(--gold-color);
+            filter: drop-shadow(0 5px 5px rgba(0,0,0,0.5));
+            z-index: 100;
+        }
+
+        /* 胜利弹窗 */
+        #overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            animation: fadeIn 0.5s;
+        }
+        #overlay h1 {
+            font-size: 4rem;
+            color: var(--gold-color);
+            text-shadow: 0 0 20px var(--gold-color);
+            margin: 0;
+        }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+<div id="controls">
+    <input type="text" id="itemInput" value="特等奖,一等奖,谢谢惠顾,二等奖,三等奖,再来一次">
+    <select id="targetSelect"></select>
+    <button onclick="startSpin()">开始抽奖</button>
+</div>
+
+<div class="wheel-container">
+    <svg class="pointer" viewBox="0 0 100 100">
+        <path d="M50 100 L20 20 A30 30 0 1 1 80 20 Z" />
+    </svg>
+    <canvas id="wheelCanvas" width="500" height="500"></canvas>
+    <canvas id="textCanvas" width="500" height="500"></canvas>
+</div>
+
+<div id="overlay" onclick="this.style.display='none'">
+    <p>恭喜获得</p>
+    <h1 id="prizeName">特等奖</h1>
+    <p>点击屏幕关闭</p>
+</div>
+
+<script>
+    const wheelCanvas = document.getElementById('wheelCanvas');
+    const textCanvas = document.getElementById('textCanvas');
+    const wheelCtx = wheelCanvas.getContext('2d');
+    const textCtx = textCanvas.getContext('2d');
+    const itemInput = document.getElementById('itemInput');
+    const targetSelect = document.getElementById('targetSelect');
+    const prizeNameDisplay = document.getElementById('prizeName');
+    const overlay = document.getElementById('overlay');
+
+    let items = [];
+    let isSpinning = false;
+    let rotation = 0; // 当前弧度
+    let angularVelocity = 0;
+
+    // 初始化/更新
+    function updateItems() {
+        items = itemInput.value.split(',').filter(i => i.trim() !== "");
+        targetSelect.innerHTML = items.map((it, i) => `<option value="${i}">${it}</option>`).join('');
+        drawWheel(0);
+    }
+    itemInput.onchange = updateItems;
+    updateItems();
+
+    function drawWheel(currentRot, moveText = true) {
+        const n = items.length;
+        const arc = (Math.PI * 2) / n;
+
+        // 绘制背景圆盘
+        wheelCtx.clearRect(0, 0, 500, 500);
+        wheelCtx.save();
+        wheelCtx.translate(250, 250);
+        wheelCtx.rotate(currentRot);
+
+        for (let i = 0; i < n; i++) {
+            wheelCtx.beginPath();
+            wheelCtx.fillStyle = i % 2 === 0 ? '#ff4757' : '#2f3542';
+            wheelCtx.moveTo(0, 0);
+            wheelCtx.arc(0, 0, 240, i * arc, (i + 1) * arc);
+            wheelCtx.fill();
+            wheelCtx.strokeSStyle = "rgba(255,255,255,0.1)";
+            wheelCtx.stroke();
+        }
+        wheelCtx.restore();
+
+        // 绘制文字图层
+        textCtx.clearRect(0, 0, 500, 500);
+        textCtx.save();
+        textCtx.translate(250, 250);
+        if(moveText) textCtx.rotate(currentRot);
+
+        textCtx.fillStyle = "white";
+        textCtx.font = "bold 18px Arial";
+        textCtx.textAlign = "right";
+
+        for (let i = 0; i < n; i++) {
+            textCtx.save();
+            textCtx.rotate(i * arc + arc / 2);
+            textCtx.fillText(items[i], 210, 10);
+            textCtx.restore();
+        }
+        textCtx.restore();
+    }
+
+    // 重置到必中项处于正上方
+    function resetToTarget() {
+        const targetIndex = parseInt(targetSelect.value);
+        const n = items.length;
+        const arc = (Math.PI * 2) / n;
+        // 目标项的中点在正上方( -Math.PI/2 )
+        rotation = - (targetIndex * arc + arc / 2) - Math.PI / 2;
+        drawWheel(rotation);
+    }
+    targetSelect.onchange = resetToTarget;
+    resetToTarget();
+
+    function startSpin() {
+        if (isSpinning) return;
+        isSpinning = true;
+
+        const mode = Math.random() > 0.5 ? 'layer' : 'gravity';
+        const targetIndex = parseInt(targetSelect.value);
+
+        if (mode === 'layer') {
+            runLayerModifier();
+        } else {
+            runGravityModifier();
+        }
+    }
+
+    // 修改器 1：图层分离
+    function runLayerModifier() {
+        let startTime = null;
+        const duration = 4000;
+        const totalSpins = 10 * Math.PI * 2;
+
+        function animate(time) {
+            if (!startTime) startTime = time;
+            let progress = (time - startTime) / duration;
+
+            if (progress < 1) {
+                // 背景转动，文字不动
+                let easeOut = 1 - Math.pow(1 - progress, 3);
+                let currentPos = rotation + easeOut * totalSpins;
+                drawWheel(currentPos, false);
+                requestAnimationFrame(animate);
+            } else {
+                finishSpin();
+            }
+        }
+        requestAnimationFrame(animate);
+    }
+
+    // 修改器 2：重力加速（模拟单摆物理）
+    function runGravityModifier() {
+        let vel = 0.5 + Math.random() * 0.2; // 初始速度
+        let friction = 0.985;
+        let gravity = 0.002;
+
+        const targetIndex = parseInt(targetSelect.value);
+        const n = items.length;
+        const arc = (Math.PI * 2) / n;
+
+        // 目标弧度偏移（正上方）
+        const targetTheta = - (targetIndex * arc + arc / 2) - Math.PI / 2;
+
+        function animate() {
+            // 物理公式：模拟重心在必中项的对面
+            // 重力加速度 alpha = -g * sin(theta - target)
+            let delta = rotation - targetTheta;
+            let gravityEffect = -gravity * Math.sin(delta);
+
+            vel += gravityEffect;
+            vel *= friction;
+            rotation += vel;
+
+            drawWheel(rotation, true);
+
+            if (Math.abs(vel) < 0.001 && Math.abs(Math.sin(delta)) < 0.05) {
+                rotation = targetTheta; // 强行吸附收尾
+                drawWheel(rotation, true);
+                finishSpin();
+            } else {
+                requestAnimationFrame(animate);
+            }
+        }
+        requestAnimationFrame(animate);
+    }
+
+    function finishSpin() {
+        isSpinning = false;
+        prizeNameDisplay.innerText = items[targetSelect.value];
+        overlay.style.display = 'flex';
+    }
+</script>
+
+</body>
+</html>
