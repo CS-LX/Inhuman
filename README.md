@@ -15,6 +15,7 @@
 | `Registration [BV1hfieBqE3u]/` | 用户身份统一注册中心 | [BV1hfieBqE3u](https://www.bilibili.com/video/BV1hfieBqE3u) |
 | `Sisyphus/` | 西西弗斯验证码 | — |
 | `Sort/` | 机器人身份验证（排序） | — |
+| `Wheel/` | 内定必中大转盘 | — |
 
 > 文件夹命名规则：带 `[BVxxxx]` 的表示有对应的 B 站视频，文件夹里同名 `html`（去掉中括号）就是整活页面入口。
 

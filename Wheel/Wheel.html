@@ -429,11 +429,11 @@
         requestAnimationFrame(animate);
     }
 
-    /** 修改器「重力」：文字与转盘同角；对侧挂重等效为有阻尼单摆，平衡于必中项在正上 */
+    /** 修改器「重力」：文字与转盘同角；对侧挂重等效为有阻尼单摆，平衡于必中项在正上（较小阻尼、较长摆动） */
     function runGravityModifier() {
-        let vel = 0.45 + Math.random() * 0.25;
-        const friction = 0.985;
-        const gravity = 0.002;
+        let vel = 0.52 + Math.random() * 0.32;
+        const friction = 0.993;
+        const gravity = 0.00145;
 
         const targetIndex = parseInt(targetSelect.value, 10);
         const n = items.length;
@@ -452,7 +452,7 @@
 
             drawWheel(rotation, true);
 
-            if (Math.abs(vel) < 0.0015 && Math.abs(delta) < 0.02) {
+            if (Math.abs(vel) < 0.0011 && Math.abs(delta) < 0.018) {
                 rotation = targetTheta;
                 drawWheel(rotation, true);
                 finishSpin();
