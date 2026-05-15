@@ -275,10 +275,31 @@
     function updateItems() {
         items = itemInput.value.split(',').filter(i => i.trim() !== "");
         targetSelect.innerHTML = items.map((it, i) => `<option value="${i}">${it}</option>`).join('');
+        if (items.length > 0) targetSelect.value = '0';
         resetToTarget();
     }
     itemInput.addEventListener('change', updateItems);
     updateItems();
+
+    /** 将当前选中的必中项旋到索引 0，其余项相对顺序不变（循环左移）。 */
+    function reorderItemsSoTargetIsFirst(selectedIndex) {
+        const n = items.length;
+        if (n === 0 || selectedIndex <= 0 || selectedIndex >= n) return;
+        items = items.slice(selectedIndex).concat(items.slice(0, selectedIndex));
+        itemInput.value = items.join(',');
+        targetSelect.innerHTML = items.map((it, i) => `<option value="${i}">${it}</option>`).join('');
+        targetSelect.value = '0';
+    }
+
+    function onTargetSelectChange() {
+        const selectedIndex = parseInt(targetSelect.value, 10);
+        if (Number.isNaN(selectedIndex)) {
+            resetToTarget();
+            return;
+        }
+        if (selectedIndex !== 0) reorderItemsSoTargetIsFirst(selectedIndex);
+        resetToTarget();
+    }
 
     /** 背景层（色块）：wheelCanvas，随 currentRot 旋转。 */
     function drawWheelBackground(currentRot) {
@@ -361,7 +382,7 @@
         rotation = -(targetIndex * arc + arc / 2) - Math.PI / 2;
         drawWheel(rotation, true);
     }
-    targetSelect.addEventListener('change', resetToTarget);
+    targetSelect.addEventListener('change', onTargetSelectChange);
     resetToTarget();
 
     function startSpin() {
